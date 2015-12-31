@@ -168,7 +168,7 @@ array(
 		$res2 = array();
 		if($res = $this->query($sql)){
 			$i = 0;
-			while($row=$res->fetch(PDO::FETCH_ASSOC)){
+			while($row=$res->fetch(\PDO::FETCH_ASSOC)){
 				foreach($row as $k=>$v){
 					$res2[$i][$k]=$v;	}
 				$i++;	}	}
