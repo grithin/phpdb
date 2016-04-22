@@ -110,6 +110,32 @@ array(
 		}
 		return $this->result;
 	}
+	/// Used for prepared statements, returns raw PDO result
+	// Ex: $db->as_rows($db->exec('select * from languages where id = :id', [':id'=>181])
+	protected function exec($sql, $variables){
+		if($this->result){
+			$this->result->closeCursor();
+		}
+		$this->last['sql'] = $sql;
+		$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
+		$this->result->execute($variables);
+
+		if((int)$this->under->errorCode()){
+			$error = $this->under->errorInfo();
+			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2]."\n ===SQL: ".$sql;
+			Debug::toss($error, 'DbException');
+		}
+		if(!$this->result){
+			$this->load();
+			$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
+			$this->result->execute($variables);
+			if(!$this->result){
+				Debug::toss("--DATABASE ERROR--\nNo result, likely connection timeout", 'DbException');
+			}
+		}
+		return $this->result;
+	}
+
 
 	/// Used internally.	Checking number of arguments for functionality
 	protected function getOverloadedSql($expected, $actual){
@@ -135,45 +161,70 @@ array(
 			$sql .= "\nLIMIT 1";	}
 		return $sql;
 	}
+	/// query returning a column value
+	/**See class note for input
+	@warning "limit 1" is appended to the sql input
+	@return	one column
+	*/
+	protected function value(){
+		$sql = $this->getOverloadedSql(1,func_get_args());
+		#function implies only 1 retured row
+		$sql = self::applyLimitOne($sql);
+
+		return $this->as_value($this->query($sql));
+	}
+	protected function as_value($res){
+		if($res){
+			return	$res->fetchColumn();
+		}
+	}
+
 	/// query returning a row
 	/**See class note for input
 	@warning "limit 1" is appended to the sql input
-	@note	if only one column, will just return it as the value
-	@return	a single row, or, if one column, return that columns value
+	@return	a single row
 	*/
 	protected function row(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		#function implies only 1 retured row
 		$sql = self::applyLimitOne($sql);
 
-		if($res = $this->query($sql)){
-			if($res->columnCount()==1){
-				return	$res->fetchColumn();	}
-			return $res->fetch(\PDO::FETCH_ASSOC);	}	}
+		return $this->as_row($this->query($sql));
+	}
+	protected function as_row($res){
+		if($res){
+			return $res->fetch(\PDO::FETCH_ASSOC);
+		}
+	}
 	///like row, but get's associated array even when single column
 	protected function assoc(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		#function implies only 1 retured row
 		$sql = self::applyLimitOne($sql);
 
-		if($res = $this->query($sql)){
-			return $res->fetch(\PDO::FETCH_ASSOC);	}	}
-
+		return $this->as_assoc($this->query($sql));
+	}
+	protected function as_assoc($res){
+		if($res){
+			return $res->fetch(\PDO::FETCH_ASSOC);	}
+	}
 	/// query returning multiple rows
 	/**See class note for input
 	@return	a sequential array of rows
 	*/
 	protected function rows($sql){
 		$sql = $this->getOverloadedSql(1,func_get_args());
+		return $this->as_rows($this->query($sql));
+	}
+	protected function as_rows($res){
 		$res2 = array();
-		if($res = $this->query($sql)){
+		if($res){
 			$i = 0;
 			while($row=$res->fetch(\PDO::FETCH_ASSOC)){
 				foreach($row as $k=>$v){
 					$res2[$i][$k]=$v;	}
 				$i++;	}	}
 		return $res2;	}
-
 
 	/// query returning a column
 	/**
@@ -182,7 +233,9 @@ array(
 	*/
 	protected function column($sql){
 		$sql = $this->getOverloadedSql(1,func_get_args());
-		$res = $this->query($sql);
+		return $this->as_column($this->query($sql));
+	}
+	protected function as_column($res){
 		while($row=$res->fetch(\PDO::FETCH_NUM)){$res2[]=$row[0];}
 		if(!is_array($res2)){
 			return array();
@@ -197,7 +250,9 @@ array(
 	*/
 	protected function columns($sql){
 		$sql = $this->getOverloadedSql(1,func_get_args());
-		$res = $this->query($sql);
+		return $this->as_columns($this->query($sql));
+	}
+	protected function as_columns($res){
 		while($row=$res->fetch(\PDO::FETCH_NUM)){$res2[]=$row;}
 		if(!is_array($res2)){
 			return array();
@@ -212,7 +267,10 @@ array(
 	protected function enumerate($sql){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		$sql .= "\nLIMIT 1";
-		return $this->query($sql)->fetch(\PDO::FETCH_NUM);
+		return $this->as_enumerate($this->query($sql));
+	}
+	protected function as_enumerate($res){
+		return $res->fetch(\PDO::FETCH_NUM);
 	}
 
 
@@ -434,7 +492,7 @@ array(
 			return $kvA['id'];
 		}elseif($matchKeys){
 			$matchKva = Arrays::extract($matchKeys,$kvA);
-			return $this->row($table,$matchKva,'id');
+			return $this->value($table,$matchKva,'id');
 		}else{
 			return $res->rowCount();
 		}
@@ -523,7 +581,7 @@ array(
 	*/
 	protected function check($table,$where){
 		$sql = $this->select($table,$where,'1');
-		return $this->row($sql) ? true : false;
+		return $this->value($sql) ? true : false;
 	}
 
 	///get the id of some row, or make it if the row doesn't exist
@@ -532,7 +590,7 @@ array(
 	*/
 	protected function id($table,$where,$additional=null){
 		$sql = $this->select($table,$where,'id');
-		$id = $this->row($sql);
+		$id = $this->value($sql);
 		if(!$id){
 			if($additional){
 				$where = Arrays::merge($where,$additional);
@@ -550,7 +608,7 @@ array(
 		if(Tool::isInt($name)){
 			return $name;
 		}
-		$id = $this->row($table,['name'=>$name],'id');
+		$id = $this->value($table,['name'=>$name],'id');
 		if($dict !== null){
 			$dict[$name] = $id;
 		}
@@ -586,7 +644,7 @@ array(
 		}else{
 			$countSql = "SELECT COUNT(*)\nFROM ".$countSql;
 		}
-		$count = $this->row($countSql);
+		$count = $this->value($countSql);
 		$results = $this->rows($sql);
 		return array($count,$results);
 	}
@@ -680,9 +738,11 @@ array(
 	protected function startTransaction(){
 		$this->under->beginTransaction();
 	}
+	# to exit a transaction, you either commit it or roll it back
 	protected function commitTransaction(){
 		$this->under->commit();
 	}
+	# to exit a transaction, you either commit it or roll it back
 	protected function rollbackTransaction(){
 		$this->under->rollBack();
 	}
