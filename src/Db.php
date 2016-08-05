@@ -135,47 +135,32 @@ Class Db{
 
 	@return	executed PDOStatement
 
-	Overloaded:
-	-	1 parameter:
-		-	[< sql string or variable array >,...]
-	-	2 parameters:
-		-	$sql, $variables
-	-	>2 parameters
-		-	mix of $sql and $variables
-
+	Takes a mix of sql strings and variable arrays, as either a single array parameter, or as parameters
 	Examples
-		-	1 param: $db->exec(['select * from user where id = :id',[':id'=>1]])
-		-	2 params: $db->exec('select * from user where id = :id',[':id'=>1])
-		-	>2 params: $db->exec('select * from','user where id = :id',[':id'=>1],'and id = :id2',[':id2'=>1] );
+		-	single array: $db->exec(['select * from user where id = :id',[':id'=>1]])
+		-	as params: $db->exec('select * from','user where id = :id',[':id'=>1],'and id = :id2',[':id2'=>1] );
 	*/
 	protected function exec(){
 		$args = func_get_args();
-		if(count($args) > 2){
-			$args = [$args];
+		if(count($args) == 1 && is_array($args[0])){
+			$args = $args[0];
 		}
-		if(count($args) == 1){
-			$bundle = $args[0];
-			if(!is_array($bundle)){
-				throw new \Exception('Mixed variables must be provided as an array');
-			}
-			# patterned after krisives Db.php
-			$sql = [];
-			$variables = [];
-			foreach($bundle as $v){
-				if(is_array($v)){
-					$variables = array_merge($variables, $v);
-				}else{
-					$sql[] = $v;
-				}
-			}
-			$sql = implode("\n", $sql);
 
-		}else{
-			list($sql, $variables) = $args;
+		$sql = [];
+		$variables = [];
+		foreach($args as $v){
+			if(is_array($v)){
+				$variables = array_merge($variables, $v);
+			}else{
+				$sql[] = $v;
+			}
 		}
+		$sql = implode("\n", $sql);
+
 		if($this->result){
 			$this->result->closeCursor();
 		}
+
 		$this->last['sql'] = $sql;
 		$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
 		if($this->result){

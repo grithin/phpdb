@@ -141,19 +141,11 @@ There is various behavior based on these rules:
 
 #### Prepared Statements
 The `exec` function is overloaded to accept three forms.  The end result of the forms is to have one joined sql string and one merged variable array.
--	1 parameter:
-	-	`[< sql string or variable array >,...]`
--	2 parameters:
-	-	$sql, $variables
--	>2 parameters
-	-	mix of $sql and $variables
+-	single array `(['sql',$var_array,'sql'])`:
+-	as params `($sql1, $var_array1, $sql2, $var_array2, $var_array3 )`
 
 ```php
-# -	1 param:
 $pdo_statement = $db->exec(['select * from user where id = :id',[':id'=>1]])
-# -	2 params:
-$pdo_statement = $db->exec('select * from user where id = :id',[':id'=>1])
-# -	>2 params:
 $pdo_statement = $db->exec('select * from','user where id = :id',[':id'=>1],'and id = :id2',[':id2'=>1] );
 ```
 
