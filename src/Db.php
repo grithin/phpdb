@@ -11,9 +11,20 @@ use Grithin\Debug;
 
 	@note public $db, the underlying PDO instance, set on lazy load
 
-	Example
-		Db::init(null,$dbConfig);
+	Example, Static Use
+		Db::init(null,$config);
 		Db::row('select * from user');
+	Example, Instance Use
+		$db = Db::init(null,$config);
+		$db->row('select * from user');
+
+	Example, External loader
+		$loader = (function($dsn, $user, $password){
+			return new \PDO($dsn,$user,$password);
+		} );
+
+		$db = Db::init('test',$config, ['loader'=>$loader, 'sql_mode'=>'']);
+
 
 */
 Class Db{
@@ -22,20 +33,17 @@ Class Db{
 	public $result;
 	/// last md call and SQL statement [call:[fn,args],sql:sql]
 	public $last;
-	/**
-	@param	connectionInfo	array:
-		@verbatim
-array(
-	driver => ...,
-	database => ...,
-	host => ...,
-	user => ...,
-	password ...
-		@endverbatim
-	@param	name	name of the connetion
+	/*
+	@param	connectionInfo	{driver:, database:, host:, user:, password:,}
+	@param	options	{
+			loader: < external loader function that returns a PDO instance and is given params ($dsn, $user, $password)  >
+			sql_mode: < blank or `ANSI`.  defaults to `ANSI`.  Controls quote style of ` or " >
+		}
 	*/
-	function __construct($connectionInfo){
+	function __construct($connectionInfo, $options=[]){
 		$this->connectionInfo = $connectionInfo;
+		$this->quote_style = '`';
+		$this->options = array_merge(['sql_mode'=>'ANSI'], $options);;
 	}
 
 	function load(){
@@ -45,7 +53,14 @@ array(
 			$dsn = $this->makeDsn($this->connectionInfo);
 		}
 		try{
-			$this->under = new \PDO($dsn,$this->connectionInfo['user'],$this->connectionInfo['password']);
+			if($this->options['loader']){
+				$this->under = $this->options['loader']($dsn,$this->connectionInfo['user'],$this->connectionInfo['password']);
+				if(!$this->under || !($this->under instanceof \PDO)){
+					throw new \Exception('Loader function did not provide PDO instance');
+				}
+			}else{
+				$this->under = new \PDO($dsn,$this->connectionInfo['user'],$this->connectionInfo['password']);
+			}
 		}catch(\PDOException $e){
 			if($this->connectionInfo['backup']){
 				$this->connectionInfo = $this->connectionInfo['backup'];
@@ -55,7 +70,11 @@ array(
 			throw $e;
 		}
 		if($this->under->getAttribute(\PDO::ATTR_DRIVER_NAME)=='mysql'){
-			$this->query('SET SESSION sql_mode=\'ANSI\'');
+			if($this->options['sql_mode'] == 'ANSI'){
+				$this->query('SET SESSION sql_mode=\'ANSI\'');
+				$this->quote_style = '"';
+			}
+
 			$this->query('SET SESSION time_zone=\'+00:00\'');
 			#$this->under->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
 		}
@@ -101,7 +120,7 @@ array(
 			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2]."\n ===SQL: ".$sql;
 			Debug::toss($error, 'DbException');
 		}
-		if(!$this->result){
+		if(!$this->result){ # the connection may have closed, so re-open it
 			$this->load();
 			$this->result = $this->under->query($sql);
 			if(!$this->result){
@@ -112,20 +131,62 @@ array(
 	}
 	/// Used for prepared statements, returns raw PDO result
 	// Ex: $db->as_rows($db->exec('select * from languages where id = :id', [':id'=>181])
-	protected function exec($sql, $variables){
+	/*
+
+	@return	executed PDOStatement
+
+	Overloaded:
+	-	1 parameter:
+		-	[< sql string or variable array >,...]
+	-	2 parameters:
+		-	$sql, $variables
+	-	>2 parameters
+		-	mix of $sql and $variables
+
+	Examples
+		-	1 param: $db->exec(['select * from user where id = :id',[':id'=>1]])
+		-	2 params: $db->exec('select * from user where id = :id',[':id'=>1])
+		-	>2 params: $db->exec('select * from','user where id = :id',[':id'=>1],'and id = :id2',[':id2'=>1] );
+	*/
+	protected function exec(){
+		$args = func_get_args();
+		if(count($args) > 2){
+			$args = [$args];
+		}
+		if(count($args) == 1){
+			$bundle = $args[0];
+			if(!is_array($bundle)){
+				throw new \Exception('Mixed variables must be provided as an array');
+			}
+			# patterned after krisives Db.php
+			$sql = [];
+			$variables = [];
+			foreach($bundle as $v){
+				if(is_array($v)){
+					$variables = array_merge($variables, $v);
+				}else{
+					$sql[] = $v;
+				}
+			}
+			$sql = implode("\n", $sql);
+
+		}else{
+			list($sql, $variables) = $args;
+		}
 		if($this->result){
 			$this->result->closeCursor();
 		}
 		$this->last['sql'] = $sql;
 		$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
-		$this->result->execute($variables);
-
+		if($this->result){
+			$this->result->execute($variables);
+		}
 		if((int)$this->under->errorCode()){
 			$error = $this->under->errorInfo();
 			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2]."\n ===SQL: ".$sql;
 			Debug::toss($error, 'DbException');
 		}
-		if(!$this->result){
+		if(!$this->result){ # the connection may have closed, so re-open it
 			$this->load();
 			$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
 			$this->result->execute($variables);
@@ -195,18 +256,6 @@ array(
 		if($res){
 			return $res->fetch(\PDO::FETCH_ASSOC);
 		}
-	}
-	///like row, but get's associated array even when single column
-	protected function assoc(){
-		$sql = $this->getOverloadedSql(1,func_get_args());
-		#function implies only 1 retured row
-		$sql = self::applyLimitOne($sql);
-
-		return $this->as_assoc($this->query($sql));
-	}
-	protected function as_assoc($res){
-		if($res){
-			return $res->fetch(\PDO::FETCH_ASSOC);	}
 	}
 	/// query returning multiple rows
 	/**See class note for input
@@ -357,10 +406,11 @@ array(
 
 	///so as to prevent the column, or the table prefix from be mistaken by db as db construct, quote the column
 	function quoteIdentity($identity,$separation=true){
-		$identity = '"'.$identity.'"';
+		$quote = $this->quote_style;
+		$identity = $quote.$identity.$quote;
 		#Fields like user.id to "user"."id"
 		if($separation && strpos($identity,'.')!==false){
-			$identity = implode('"."',explode('.',$identity));
+			$identity = implode($quote.'.'.$quote,explode('.',$identity));
 		}
 		return $identity;
 	}
@@ -414,7 +464,7 @@ array(
 			}else{
 				$v = $this->quote($v);
 			}
-			$keys[] = '"'.$k.'"';
+			$keys[] = $this->quoteIdentity($k);
 			$values[] = $v;
 		}
 		return array($keys,$values);
@@ -546,9 +596,9 @@ array(
 			$columns = '*';
 		}
 		if(is_array($from)){
-			$from = '"'.implode('", "',$from).'"';
+			implode(', ', array_map([$this,'quoteIdentity'],$from));
 		}elseif(strpos($from,' ') === false){//ensure no space; don't quote a from statement
-			$from = '"'.$from.'"';
+			$from = $this->quoteIdentity($from);
 		}
 		if(is_array($columns)){
 			$columns = implode(', ',array_map([$this,'quoteIdentity'],$columns));
@@ -565,7 +615,7 @@ array(
 					$part[1] = 'ASC';
 				}
 				//'"' works with functions like "sum(cost)"
-				$orders[] = '"'.$part[0].'" '.$part[1];
+				$orders[] = $this->quoteIdentity($part[0]).' '.$part[1];
 			}
 			$select .= "\nORDER BY ".implode(',',$orders);
 		}
@@ -584,7 +634,7 @@ array(
 		return $this->value($sql) ? true : false;
 	}
 
-	///get the id of some row, or make it if the row doesn't exist
+	/// get the id of some row, or make it if the row doesn't exist
 	/**
 	@param	additional	additional fields to merge with where on insert
 	*/
