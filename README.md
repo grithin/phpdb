@@ -90,7 +90,7 @@ Db::rows('select * from user');
 Db::column('select name from user');
 #> ['bob','bill']
 
-Db::column('select * from user');
+Db::columns('select * from user');
 #> [['1','bob'],[['2','bill']]
 
 list($id, $name) =  Db::enumerate('select id, name from user');
