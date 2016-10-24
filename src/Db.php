@@ -18,12 +18,20 @@ use Grithin\Debug;
 		$db = Db::init(null,$config);
 		$db->row('select * from user');
 
-	Example, External loader
-		$loader = (function($dsn, $user, $password){
-			return new \PDO($dsn,$user,$password);
-		} );
+	Examples, external instance
+		$db = Db::singleton($config);
 
-		$db = Db::init('test',$config, ['loader'=>$loader, 'sql_mode'=>'']);
+		# Case 1, using a separate loader
+		$loader = function() use ($db){
+			$db->load_once(); # ensure 1st db is loaded
+			return $db->under; # return the PDO instance of 1st db
+		};
+		$db2 = Db::init('num 2')->with_loader($loader);
+		$x = $db2->row('select * from inquiry');
+
+		# Case 2, using an existing PDO instance
+		$db3 = Db::init('num 3')->with_pdo($db2->under);
+		$x = $db3->row('select * from inquiry');
 
 
 */
@@ -40,26 +48,25 @@ Class Db{
 			sql_mode: < blank or `ANSI`.  defaults to `ANSI`.  Controls quote style of ` or " >
 		}
 	*/
-	function __construct($connectionInfo, $options=[]){
+	function __construct($connectionInfo=[], $options=[]){
 		$this->connectionInfo = $connectionInfo;
 		$this->quote_style = '`';
 		$this->options = array_merge(['sql_mode'=>'ANSI'], $options);;
 	}
 
 	function load(){
-		if($this->connectionInfo['dsn']){
-			$dsn = $this->connectionInfo['dsn'];
-		}else{
-			$dsn = $this->makeDsn($this->connectionInfo);
+		echo 'loading...';
+		if(!$this->connectionInfo['dsn']){
+			$this->connectionInfo['dsn'] =  $this->makeDsn($this->connectionInfo);
 		}
 		try{
 			if($this->options['loader']){
-				$this->under = $this->options['loader']($dsn,$this->connectionInfo['user'],$this->connectionInfo['password']);
+				$this->under = $this->options['loader']($this->connectionInfo);
 				if(!$this->under || !($this->under instanceof \PDO)){
 					throw new \Exception('Loader function did not provide PDO instance');
 				}
 			}else{
-				$this->under = new \PDO($dsn,$this->connectionInfo['user'],$this->connectionInfo['password']);
+				$this->under = new \PDO($this->connectionInfo['dsn'], $this->connectionInfo['user'], $this->connectionInfo['password']);
 			}
 		}catch(\PDOException $e){
 			if($this->connectionInfo['backup']){
@@ -79,6 +86,18 @@ Class Db{
 			#$this->under->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
 		}
 	}
+	# load db with existing pdo instance
+	function with_pdo($pdo){
+		$this->loaded = true;
+		$this->under = $pdo;
+		return $this;
+	}
+	# load db with separate loader
+	function with_loader($loader){
+		$this->options['loader'] = $loader;
+		return $this;
+	}
+
 	function makeDsn($connectionInfo){
 		$connectionInfo['port'] = $connectionInfo['port'] ? $connectionInfo['port'] : '3306';
 		return $connectionInfo['driver'].':dbname='.$connectionInfo['database'].';host='.$connectionInfo['host'].';port='.$connectionInfo['port'];
