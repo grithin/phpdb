@@ -55,7 +55,6 @@ Class Db{
 	}
 
 	function load(){
-		echo 'loading...';
 		if(!$this->connectionInfo['dsn']){
 			$this->connectionInfo['dsn'] =  $this->makeDsn($this->connectionInfo);
 		}
