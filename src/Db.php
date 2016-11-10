@@ -5,11 +5,15 @@ use Grithin\Tool;
 use Grithin\Debug;
 /**Class details:
 	- @warning Class sets sql_mode to ansi sql if mysql db to allow interroperability with postgres.	As such, double quotes " become table and column indicators, ` become useless, and single quotes are used as the primary means to quote strings
-	- @note Most of the querying methods are overloaded; there are two forms of possible input:
-		- Form 1:	simple sql string; eg "select * from bob where bob = 'bob'"
-		- Form 2: 	see self::select
 
-	@note public $db, the underlying PDO instance, set on lazy load
+	@NOTE Most of the querying methods are overloaded; there are two forms of possible input:
+		-	straight sql: $x = Db::row('select * from inquiry where id = 6');
+		-	prepared statement: $x = Db::row(['select * from inquiry where id = :id',['id'=>7]]);
+			-	see self::prepare
+		-	table and dictionary: #$x = Db::row('inquiry', ['id'=>7]);
+			-	see self::select
+
+	@NOTE public $under, the underlying PDO instance, set on lazy load
 
 	Example, Static Use
 		Db::init(null,$config);
@@ -41,6 +45,9 @@ Class Db{
 	public $result;
 	/// last md call and SQL statement [call:[fn,args],sql:sql]
 	public $last;
+	/// boolean indicating whether the last statement failed, and currently attempting to reconnect to database and run again
+	public $reconnecting = false;
+
 	/*
 	@param	connectionInfo	{driver:, database:, host:, user:, password:,}
 	@param	options	{
@@ -120,45 +127,62 @@ Class Db{
 	}
 	/// return last run sql
 	protected function lastSql(){
-		return $this->last['sql'];
+		if(!is_string($this->last['sql'])){
+			return json_encode($this->last['sql']);
+		}else{
+			return $this->last['sql'];
+		}
 	}
 	/// perform database query
 	/**
 	@param	sql	the sql to be run
-	@return the PDOStatement object
+	@return the executred PDOStatement object
 	*/
 	protected function query($sql){
+		# clear opened, unclosed cursors, if any
 		if($this->result){
 			$this->result->closeCursor();
 		}
-		$this->last['sql'] = $sql;
-		$this->result = $this->under->query($sql);
-		if((int)$this->under->errorCode()){
-			$error = $this->under->errorInfo();
-			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2]."\n ===SQL: ".$sql;
-			Debug::toss($error, 'DbException');
+
+		# Generate a prepared statement
+		if(is_array($sql)){
+			$sql = $this->prepare($sql);
 		}
-		if(!$this->result){ # the connection may have closed, so re-open it
-			$this->load();
+
+		if(is_a($sql, \PDOStatement::class)){
+			$this->last['sql'] = [$sql->queryString, $sql->variables];
+			$sql->execute($sql->variables);
+			$this->result = $sql;
+
+		}else{
+			$this->last['sql'] = $sql;
 			$this->result = $this->under->query($sql);
-			if(!$this->result){
-				Debug::toss("--DATABASE ERROR--\nNo result, likely connection timeout", 'DbException');
-			}
+		}
+
+		$this->handle_error();
+
+		if(!$this->result){
+			$this->result = $this->retry(__FUNCTION__, [$sql]);
 		}
 		return $this->result;
 	}
-	/// Used for prepared statements, returns raw PDO result
-	// Ex: $db->as_rows($db->exec('select * from languages where id = :id', [':id'=>181])
-	/*
 
-	@return	executed PDOStatement
-
-	Takes a mix of sql strings and variable arrays, as either a single array parameter, or as parameters
+	/* In allowance for the common use of accumluation of mixed wheres of SQL and variable dictionaries
 	Examples
-		-	single array: $db->exec(['select * from user where id = :id',[':id'=>1]])
-		-	as params: $db->exec('select * from','user where id = :id',[':id'=>1],'and id = :id2',[':id2'=>1] );
+	-	(
+			['select * from user where id = :id',
+			[':id'=>1]]
+		);
+	-	(
+			'select * from','user where id = :id',
+			[':id'=>1],
+			'and id = :id2',
+			[':id2'=>1]
+		);
+
+	@NOTE	no attempt to prefix dictionary keys with `:` since a statement with `where id = :id` will accept either [':id'=>1] or ['id'=>1]
 	*/
-	protected function exec(){
+	protected function sql_and_variables(){
 		$args = func_get_args();
 		if(count($args) == 1 && is_array($args[0])){
 			$args = $args[0];
@@ -174,42 +198,70 @@ Class Db{
 			}
 		}
 		$sql = implode("\n", $sql);
+		return [$sql, $variables];
+	}
+	# runs self::sql_and_variables, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
+	protected function prepare(){
+		list($sql, $variables) = call_user_func_array([$this, 'sql_and_variables'], func_get_args());
 
 		if($this->result){
 			$this->result->closeCursor();
 		}
 
 		$this->last['sql'] = $sql;
-		$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
-		if($this->result){
-			$this->result->execute($variables);
+		$prepared = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
+
+		$this->handle_error();
+
+		if(!$prepared){
+			$prepared = $this->retry(__FUNCTION__, func_get_args());
 		}
+		$prepared->variables = $variables; # custom attribute for later binding
+		return $prepared;
+	}
+	protected function handle_error($additional_info=false){
 		if((int)$this->under->errorCode()){
 			$error = $this->under->errorInfo();
-			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2]."\n ===SQL: ".$sql;
+			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2];
+			if($additional_info){
+				$error .= "\n===ADDITIONAL: ".$additional_info;
+			}
+			$error .= "\n ===SQL: ".$this->lastSql();
 			Debug::toss($error, 'DbException');
 		}
-		if(!$this->result){ # the connection may have closed, so re-open it
-			$this->load();
-			$this->result = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
-			$this->result->execute($variables);
-			if(!$this->result){
-				Debug::toss("--DATABASE ERROR--\nNo result, likely connection timeout", 'DbException');
-			}
+	}
+	protected function retry($function, $arguments){
+		if($this->$reconnecting){
+			Debug::toss("--DATABASE ERROR--\nNo result, likely connection timeout", 'DbException');
 		}
-		return $this->result;
+		$this->$reconnecting = true;
+		$this->load();
+		$return = call_user_func_array([$this, $function], $arguments);
+		$this->$reconnecting = false;
+		return $return;
+	}
+
+	/// Used for prepared statements, returns raw PDO result
+	// Ex: $db->as_rows($db->exec('select * from languages where id = :id', [':id'=>181])
+	/*
+
+	@return	executed PDOStatement
+
+	Takes a mix of sql strings and variable arrays, as either a single array parameter, or as parameters
+	Examples
+		-	single array: $db->exec(['select * from user where id = :id',[':id'=>1]])
+		-	as params: $db->exec('select * from','user where id = :id',[':id'=>1],'and id = :id2',[':id2'=>1] );
+	*/
+	protected function exec(){
+		return $this->query(call_user_func_array([$this,'prepare'], func_get_args()));
 	}
 
 
 	/// Used internally.	Checking number of arguments for functionality
 	protected function getOverloadedSql($expected, $actual){
 		$count = count($actual);
-		if($count == 1 && strpos($actual[0],' ') === false){//single word string, this is a no-where table
-			$actual[] = '1=1';
-			$overloaded = 1;
-		}else{
-			$overloaded = $count - $expected;
-		}
+		$overloaded = $count - $expected;
+
 		if($overloaded > 0){
 			//$overloaded + 1 because the expected $sql is actually one of the overloading variables
 			$overloaderArgs = array_slice($actual,-($overloaded + 1));
@@ -220,10 +272,25 @@ Class Db{
 		}
 	}
 
+	static function sql_is_limited($sql){
+		return preg_match('@[\s]*show|limit\s*[0-9]+(,\s*[0-9]+)?@i',$sql);
+	}
+
 	protected function applyLimitOne($sql){
-		if(!preg_match('@[\s]*show|limit\s*[0-9]+(,\s*[0-9]+)?@i',$sql)){
+		#++ handle prepared statement type sql argument {
+		if(is_array($sql)){
+			$sql = $this->sql_and_variables($sql);
+			if(!self::sql_is_limited($sql[0])){
+				$sql[0] .= "\nLIMIT 1";
+			}
+			return $sql;
+		}
+		#++ }
+		# handle normal string sql argument {
+		if(!self::sql_is_limited($sql)){
 			$sql .= "\nLIMIT 1";	}
 		return $sql;
+		#++ }
 	}
 	/// query returning a column value
 	/**See class note for input
@@ -247,6 +314,11 @@ Class Db{
 	/**See class note for input
 	@warning "limit 1" is appended to the sql input
 	@return	a single row
+
+	Examples:
+	-	straight sql: $x = Db::row('select * from inquiry where id = 6');
+	-	prepared statement: $x = Db::row(['select * from inquiry where id = :id',['id'=>7]]);
+	-	table and dictionary: #$x = Db::row('inquiry', ['id'=>7]);
 	*/
 	protected function row(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
