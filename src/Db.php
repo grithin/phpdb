@@ -151,15 +151,17 @@ Class Db{
 
 		if(is_a($sql, \PDOStatement::class)){
 			$this->last['sql'] = [$sql->queryString, $sql->variables];
-			$sql->execute($sql->variables);
+			$success = $sql->execute($sql->variables);
+			if(!$success){
+				$this->handle_error($sql);
+			}
 			$this->result = $sql;
-
 		}else{
 			$this->last['sql'] = $sql;
 			$this->result = $this->under->query($sql);
 		}
 
-		$this->handle_error();
+		$this->handle_error($this->under);
 
 		if(!$this->result){
 			$this->result = $this->retry(__FUNCTION__, [$sql]);
@@ -211,7 +213,7 @@ Class Db{
 		$this->last['sql'] = $sql;
 		$prepared = $this->under->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
 
-		$this->handle_error();
+		$this->handle_error($this->under);
 
 		if(!$prepared){
 			$prepared = $this->retry(__FUNCTION__, func_get_args());
@@ -219,9 +221,12 @@ Class Db{
 		$prepared->variables = $variables; # custom attribute for later binding
 		return $prepared;
 	}
-	protected function handle_error($additional_info=false){
-		if((int)$this->under->errorCode()){
-			$error = $this->under->errorInfo();
+	/*
+		PDOStatement and PDO object both have `errorCode` and `errorInfo`, and a statement may have an error without showing up in the PDO object.
+	*/
+	protected function handle_error($errorable=null, $additional_info=false){
+		if((int)$errorable->errorCode()){
+			$error = $errorable->errorInfo();
 			$error = "--DATABASE ERROR--\n".' ===ERROR: '.$error[0].'|'.$error[1].'|'.$error[2];
 			if($additional_info){
 				$error .= "\n===ADDITIONAL: ".$additional_info;
@@ -292,6 +297,15 @@ Class Db{
 		return $sql;
 		#++ }
 	}
+
+	protected function as_conform_res($args){
+		if(!is_a($args[0], \PDOStatement::class)){
+			$args[0] = call_user_func_array([$this,'exec'], $args);
+		}
+		return $args[0];
+	}
+
+
 	/// query returning a column value
 	/**See class note for input
 	@warning "limit 1" is appended to the sql input
@@ -305,9 +319,8 @@ Class Db{
 		return $this->as_value($this->query($sql));
 	}
 	protected function as_value($res){
-		if($res){
-			return	$res->fetchColumn();
-		}
+		$res = $this->as_conform_res(func_get_args());
+		return	$res->fetchColumn();
 	}
 
 	/// query returning a row
@@ -328,9 +341,8 @@ Class Db{
 		return $this->as_row($this->query($sql));
 	}
 	protected function as_row($res){
-		if($res){
-			return $res->fetch(\PDO::FETCH_ASSOC);
-		}
+		$res = $this->as_conform_res(func_get_args());
+		return $res->fetch(\PDO::FETCH_ASSOC);
 	}
 	/// query returning multiple rows
 	/**See class note for input
@@ -341,13 +353,13 @@ Class Db{
 		return $this->as_rows($this->query($sql));
 	}
 	protected function as_rows($res){
+		$res = $this->as_conform_res(func_get_args());
 		$res2 = array();
-		if($res){
-			$i = 0;
-			while($row=$res->fetch(\PDO::FETCH_ASSOC)){
-				foreach($row as $k=>$v){
-					$res2[$i][$k]=$v;	}
-				$i++;	}	}
+		$i = 0;
+		while($row=$res->fetch(\PDO::FETCH_ASSOC)){
+			foreach($row as $k=>$v){
+				$res2[$i][$k]=$v;	}
+			$i++;	}
 		return $res2;	}
 
 	/// query returning a column
@@ -360,6 +372,7 @@ Class Db{
 		return $this->as_column($this->query($sql));
 	}
 	protected function as_column($res){
+		$res = $this->as_conform_res(func_get_args());
 		while($row=$res->fetch(\PDO::FETCH_NUM)){$res2[]=$row[0];}
 		if(!is_array($res2)){
 			return array();
@@ -377,6 +390,7 @@ Class Db{
 		return $this->as_columns($this->query($sql));
 	}
 	protected function as_columns($res){
+		$res = $this->as_conform_res(func_get_args());
 		while($row=$res->fetch(\PDO::FETCH_NUM)){$res2[]=$row;}
 		if(!is_array($res2)){
 			return array();
@@ -394,6 +408,7 @@ Class Db{
 		return $this->as_enumerate($this->query($sql));
 	}
 	protected function as_enumerate($res){
+		$res = $this->as_conform_res(func_get_args());
 		return $res->fetch(\PDO::FETCH_NUM);
 	}
 
