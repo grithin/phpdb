@@ -36,9 +36,14 @@ use Grithin\Debug;
 		# Case 2, using an existing PDO instance
 		$db3 = Db::init('num 3')->with_pdo($db2->under);
 		$x = $db3->row('select * from inquiry');
-
-
 */
+/* Usage Notes
+	On the methods executing an input and formating results, they accept multiple types of input (see doc on `row`).  There are 3 primary types:
+	1.	plain full sql
+	2.	prepared statement (wrapped in an array with variables like `['select bob from bob where bob = ?', [1]]`)
+	3.	interpretted variables (see `select`), of the parameter form `($from,$where=null,$columns='*',$order=null,$limit=null)`
+*/
+
 Class Db{
 	use \Grithin\SDLL;
 	/// latest result set returning from $db->query()
@@ -178,8 +183,18 @@ Class Db{
 	-	(
 			'select * from','user where id = :id',
 			[':id'=>1],
-			'and id = :id2',
+			'and id2 = :id2',
 			[':id2'=>1]
+		);
+	-	(
+			['select * from user where id = ?',
+			[1]]
+		);
+	-	(
+			'select * from','user where id = ?',
+			[1],
+			'and id2 = ?',
+			[1]
 		);
 
 	@NOTE	no attempt to prefix dictionary keys with `:` since a statement with `where id = :id` will accept either [':id'=>1] or ['id'=>1]
@@ -331,6 +346,8 @@ Class Db{
 	Examples:
 	-	straight sql: $x = Db::row('select * from inquiry where id = 6');
 	-	prepared statement: $x = Db::row(['select * from inquiry where id = :id',['id'=>7]]);
+	-	prepared statement: $x = Db::row(['select * from inquiry where id = :id',[':id'=>7]]);
+	-	prepared statement: $x = Db::row(['select * from inquiry where id = ?',[7]]);
 	-	table and dictionary: #$x = Db::row('inquiry', ['id'=>7]);
 	*/
 	protected function row(){
