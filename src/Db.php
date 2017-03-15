@@ -215,6 +215,13 @@ Class Db{
 			}
 		}
 		$sql = implode("\n", $sql);
+		# ensure no non-scalar variables
+
+		foreach($variables as $variable){
+			if(!is_scalar($variable)){
+				throw new \Exception('Non scalar SQL statement variable: '.var_export($variable, true));
+			}
+		}
 		return [$sql, $variables];
 	}
 	# runs self::sql_and_variables, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
