@@ -48,7 +48,7 @@ Class Db{
 	use \Grithin\SDLL;
 	/// latest result set returning from $db->query()
 	public $result;
-	/// last md call and SQL statement [call:[fn,args],sql:sql]
+	/// last method call, args, and last sql thing (which might be SQL string + variables, or just SQL string). Ex  [call:[fn,args],sql:sql]
 	public $last;
 	/// boolean indicating whether the last statement failed, and currently attempting to reconnect to database and run again
 	public $reconnecting = false;
@@ -113,6 +113,11 @@ Class Db{
 		$connectionInfo['port'] = $connectionInfo['port'] ? $connectionInfo['port'] : '3306';
 		return $connectionInfo['driver'].':dbname='.$connectionInfo['database'].';host='.$connectionInfo['host'].';port='.$connectionInfo['port'];
 	}
+	# the overhead is worth the expectation
+	function make_dsn(){
+		return calL_user_func_array([$this,'makeDsn'], func_get_args());
+	}
+
 	function __toString(){
 		return var_export($this->connectionInfo,true);
 	}
@@ -137,6 +142,10 @@ Class Db{
 		}else{
 			return $this->last['sql'];
 		}
+	}
+	# the overhead is worth the expectation
+	protected function last_sql(){
+		return calL_user_func_array([$this,'lastSql'], func_get_args());
 	}
 	/// perform database query
 	/**
@@ -218,7 +227,8 @@ Class Db{
 		# ensure no non-scalar variables
 
 		foreach($variables as $variable){
-			if(!is_scalar($variable)){
+			# if this is a non-scalar and does not have a __toString method, error
+			if(!is_scalar($variable) &&  ! (is_object($variable) && method_exists($variable, '__toString')) ){
 				throw new \Exception('Non scalar SQL statement variable: '.var_export($variable, true));
 			}
 		}
@@ -453,6 +463,10 @@ Class Db{
 			return Arrays::subsOnKey($rows,$key);
 		}
 	}
+	# the overhead is worth the expectation
+	protected function column_key(){
+		return calL_user_func_array([$this,'columnKey'], func_get_args());
+	}
 
 	///Key to value formatter (used for where clauses and updates)
 	/**
@@ -518,8 +532,8 @@ Class Db{
 		}
 	}
 
-	///so as to prevent the column, or the table prefix from be mistaken by db as db construct, quote the column
-	function quoteIdentity($identity,$separation=true){
+	# handles [a-z9-9_] style identities without asking Db to do the quoting
+	protected function quoteIdentity($identity,$separation=true){
 		$quote = $this->quote_style;
 		$identity = $quote.$identity.$quote;
 		#Fields like user.id to "user"."id"
@@ -527,6 +541,10 @@ Class Db{
 			$identity = implode($quote.'.'.$quote,explode('.',$identity));
 		}
 		return $identity;
+	}
+	# the overhead is worth the expectation
+	protected function quote_identity(){
+		return calL_user_func_array([$this,'quoteIdentity'], func_get_args());
 	}
 
 	/// construct where clause from array or string
@@ -615,6 +633,10 @@ Class Db{
 	protected function insertIgnore($table,$kvA,$matchKeys=null){
 		return $this->into('INSERT IGNORE',$table,$kvA,'',$matchKeys);
 	}
+	# the overhead is worth the expectation
+	protected function insert_ignore(){
+		return calL_user_func_array([$this,'insertIgnore'], func_get_args());
+	}
 	/// insert into table; on duplicate key update
 	/**
 	@param	table	table to insert on
@@ -630,6 +652,10 @@ Class Db{
 			$update = implode(', ',$this->ktvf($update,2));
 		}
 		return $this->into('INSERT',$table,$kvA,"\nON DUPLICATE KEY UPDATE\n".$update,$matchKeys);
+	}
+	# the overhead is worth the expectation
+	protected function insert_update(){
+		return calL_user_func_array([$this,'insertUpdate'], func_get_args());
 	}
 
 	/// replace on a table
@@ -778,6 +804,10 @@ Class Db{
 		}
 		return $id;
 	}
+	# the overhead is worth the expectation
+	protected function named_id(){
+		return calL_user_func_array([$this,'namedId'], func_get_args());
+	}
 
 	/// perform a count and select rows; doesn't work with all sql
 	/**
@@ -812,6 +842,10 @@ Class Db{
 		$results = $this->rows($sql);
 		return array($count,$results);
 	}
+	# the overhead is worth the expectation
+	protected function count_and_rows(){
+		return calL_user_func_array([$this,'countAndRows'], func_get_args());
+	}
 //+ }
 
 //+	db information {
@@ -820,6 +854,10 @@ Class Db{
 			return true;
 		}
 		return (bool) count($this->rows('show tables like '.$this->quote($table)));
+	}
+	# the overhead is worth the expectation
+	protected function table_exists(){
+		return calL_user_func_array([$this,'tableExists'], func_get_args());
 	}
 	//Get database tables
 	protected function tables(){
@@ -860,6 +898,10 @@ Class Db{
 			$this->tableInfo[$table] = ['columns'=>$columns,'keys'=>$keys];
 		}
 		return $this->tableInfo[$table];
+	}
+	# the overhead is worth the expectation
+	protected function table_info(){
+		return calL_user_func_array([$this,'tableInfo'], func_get_args());
 	}
 	//take db specific column type and translate it to general
 	static function parseColumnType($type){
@@ -902,12 +944,24 @@ Class Db{
 	protected function startTransaction(){
 		$this->under->beginTransaction();
 	}
+	# the overhead is worth the expectation
+	protected function start_transaction(){
+		return calL_user_func_array([$this,'startTransaction'], func_get_args());
+	}
 	# to exit a transaction, you either commit it or roll it back
 	protected function commitTransaction(){
 		$this->under->commit();
 	}
+	# the overhead is worth the expectation
+	protected function commit_transaction(){
+		return calL_user_func_array([$this,'commitTransaction'], func_get_args());
+	}
 	# to exit a transaction, you either commit it or roll it back
 	protected function rollbackTransaction(){
 		$this->under->rollBack();
+	}
+	# the overhead is worth the expectation
+	protected function rollback_transaction(){
+		return calL_user_func_array([$this,'rollbackTransaction'], func_get_args());
 	}
 }
