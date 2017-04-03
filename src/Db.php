@@ -396,6 +396,13 @@ Class Db{
 			$i++;	}
 		return $res2;	}
 
+	# get all records
+	protected function all($table){
+		$args = func_get_args();
+		array_splice($args, 1, 0, '1=1');
+		return calL_user_func_array([$this,'rows'], $args);
+	}
+
 	/// query returning a column
 	/**
 	See class note for input
@@ -463,7 +470,7 @@ Class Db{
 			return Arrays::subsOnKey($rows,$key);
 		}
 	}
-	# the overhead is worth the expectation
+	# alias; the overhead is worth the expectation
 	protected function column_key(){
 		return calL_user_func_array([$this,'columnKey'], func_get_args());
 	}

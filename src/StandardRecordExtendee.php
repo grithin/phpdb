@@ -1,40 +1,38 @@
 <?
 /* About
-Generic instance use of StandardRecordAbstract
+For extending StandardRecordAbstract
 */
 
 namespace Grithin;
 
 use \Exception;
 
-class StandardRecord extends StandardRecordAbstract{
+abstract class StandardRecordExtendee extends StandardRecordAbstract{
+	static $table;
+	static $id_column = 'id';
 	public $transformers = ['get'=>null, 'set'=>null];
 	public $json_mapped_columns = [];
 	# see Grithin\Record for other option values
 	/*	params
 		options; {
 			db: < db object >
-			json_mapped_columns: (
-				< array of columns without affix > []
-				||
-				< boolean, indicated getter should build list from gotten >
-			)
 			initial_record: < preloaded record >
 		}
 	*/
-	public function __construct($identifier, $table, $options=[]){
+	public function __construct($identifier, $options=[]){
 		$this->db = $options['db'] ? $options['db'] : \Grithin\Db::primary();
 
-		$this->table = $table;
-
-
-		if($options['json_mapped_columns']){
-			$this->json_mapped_columns = $options['json_mapped_columns'];
+		if(!static::$table){
+			throw new Exception('Must provide table');
 		}
+		$this->table = static::$table;
 
 		#+ handle record transformer options {
-		if($options['transformers']){
-			$this->transformers = Arrays::merge($this->transformers, $options['transformers']);
+		if(method_exists($this, 'tranformer_on_get')){
+			$this->transformers['get'] = [$this, 'tranformer_on_get'];
+		}
+		if(method_exists($this, 'tranformer_on_set')){
+			$this->transformers['set'] = [$this, 'tranformer_on_set'];
 		}
 		if($this->json_mapped_columns){
 			if(!$this->transformers['get']){
@@ -47,6 +45,9 @@ class StandardRecord extends StandardRecordAbstract{
 		#+ }
 
 
+
+
+
 		if($options['initial_record'] && $this->transformers['get']){
 			$options['initial_record'] = $this->transformers['get']($options['initial_record']);
 		}
@@ -54,14 +55,13 @@ class StandardRecord extends StandardRecordAbstract{
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
 	# utility function to create a new record and return it as this class
-	static function create($table, $record, $db=null, $options=[]){
+	static function create($record, $db=null, $options=[]){
 		$db = $db ? $db : \Grithin\Db::primary();
-		$id = $db->insert($table, $record);
-		$id_column = $options['id_column'] ? $options['id_column'] : 'id';
-		$record[$id_column] = $id;
+		$id = $db->insert(static::$table, $record);
+		$record[static::$id_column] = $id;
 		$options['db'] = $db;
 		$options['initial_record'] = $record;
-		$class = __CLASS__;
-		return new $class($id, $table, $options);
+		return new static([static::$id_column => $id], $options);
 	}
+
 }
