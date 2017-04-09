@@ -45,17 +45,20 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		#+ }
 
 
-
-
-
+		# transform initial_record, as thought it were from the database
 		if($options['initial_record'] && $this->transformers['get']){
 			$options['initial_record'] = $this->transformers['get']($options['initial_record']);
+		}
+
+		# identifier is an id, use the id column (which might not be named `id`)
+		if(Tool::isInt($identifier)){
+			$identifier = [static::$id_column => $identifier];
 		}
 
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
 	# utility function to create a new record and return it as this class
-	static function create($record, $db=null, $options=[]){
+	static function static_creates($record, $db=null, $options=[]){
 		$db = $db ? $db : \Grithin\Db::primary();
 		$id = $db->insert(static::$table, $record);
 		$record[static::$id_column] = $id;
@@ -63,5 +66,7 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		$options['initial_record'] = $record;
 		return new static([static::$id_column => $id], $options);
 	}
-
+	static function json_columns_extract_from_db($db){
+		return self::json_columns_extract_from_db_by_table_and_db(static::$table, $db);
+	}
 }

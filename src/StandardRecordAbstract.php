@@ -6,6 +6,7 @@
 
 namespace Grithin;
 
+
 use \Exception;
 
 abstract class StandardRecordAbstract extends \Grithin\Record{
@@ -14,6 +15,9 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 
 	public function getter($self){
 		$row = $this->db->row($this->table, $this->identifier);
+		if(!$row){
+			throw new Exception('Getter did not find row in table "'.$this->table.'" on identifier: '.Tool::json_encode($this->identifier));
+		}
 		if($this->transformers['get']){
 			$row = $this->transformers['get']($row);
 		}
@@ -38,21 +42,30 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 		$detransformed_changes = (array)$changes;
 		if($this->json_mapped_columns){
 			foreach($this->json_mapped_columns as $column){
-				$detransformed_changes[$column.'__json'] = $detransformed_changes[$column];
-				unset($detransformed_changes[$column]);
+				if(array_key_exists($column, $detransformed_changes)){
+					$detransformed_changes[$column.'__json'] = $detransformed_changes[$column];
+					unset($detransformed_changes[$column]);
+				}
 			}
 		}
 		return self::static_json_encode($detransformed_changes);
 	}
 	public function setter($self, $changes){
 		if($changes){
-			$changes_to_apply = Arrays::from($changes);
+			# $this->record already has diff applied, which means removed columns will not be present
+			# also, we deal with columns, so can't make sub-column changes, must apply to full column
+			$based_changes = Arrays::pick($this->record, array_keys(Arrays::from($changes)));
+
 			if($this->transformers['set']){
-				$changes_to_apply = $this->transformers['set']($changes_to_apply);
+				$based_changes = $this->transformers['set']($based_changes);
 			}
-			$this->db->update($this->table, $changes_to_apply, $this->identifier);
+			if($based_changes){
+				ppe($based_changes);
+				$this->db->update($this->table, $based_changes, $this->identifier);
+			}
 		}
-		return Arrays::merge($this->stored_record, $changes);
+
+		return $this->record;
 	}
 	static function json_columns_extract_by_affix($record){
 		$columns = [];
@@ -62,6 +75,10 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 			}
 		}
 		return $columns;
+	}
+	static function json_columns_extract_from_db_by_table_and_db($table, $db){
+		$names = $db->column_names($table);
+		return self::json_columns_extract_by_affix(array_flip($names));
 	}
 }
 
@@ -126,4 +143,3 @@ $test->before_change($print);
 $test['test'] = ['bob'=>'12dd43is3s'];
 $test->apply();
 */
-

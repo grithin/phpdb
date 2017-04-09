@@ -228,7 +228,7 @@ Class Db{
 
 		foreach($variables as $variable){
 			# if this is a non-scalar and does not have a __toString method, error
-			if(!is_scalar($variable) &&  ! (is_object($variable) && method_exists($variable, '__toString')) ){
+			if(!Tool::is_scalar($variable) &&  ! (is_object($variable) && method_exists($variable, '__toString')) ){
 				throw new \Exception('Non scalar SQL statement variable: '.var_export($variable, true));
 			}
 		}
@@ -909,6 +909,9 @@ Class Db{
 	# the overhead is worth the expectation
 	protected function table_info(){
 		return calL_user_func_array([$this,'tableInfo'], func_get_args());
+	}
+	protected function column_names($table){
+		return array_keys($this->table_info($table)['columns']);
 	}
 	//take db specific column type and translate it to general
 	static function parseColumnType($type){
