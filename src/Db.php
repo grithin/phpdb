@@ -302,11 +302,15 @@ Class Db{
 		if($overloaded > 0){
 			//$overloaded + 1 because the expected $sql is actually one of the overloading variables
 			$overloaderArgs = array_slice($actual,-($overloaded + 1));
-			return call_user_func_array(array($this,'select'),$overloaderArgs);
-
+			$sql = call_user_func_array(array($this,'select'),$overloaderArgs);
 		}else{
-			return end($actual);
+			$sql = end($actual);
+			if(is_string($sql) && preg_match('@^[^\s]+$@', $sql)){
+				# appears to be just a table name, so format it
+				$sql = 'select * from '.self::quote_identity($sql);
+			}
 		}
+		return $sql;
 	}
 
 	static function sql_is_limited($sql){
@@ -473,6 +477,13 @@ Class Db{
 	# alias; the overhead is worth the expectation
 	protected function column_key(){
 		return calL_user_func_array([$this,'columnKey'], func_get_args());
+	}
+
+	protected function rows_by_column($key, $sql){
+		$arguments = func_get_args();
+		array_shift($arguments);
+		$rows = call_user_func_array(array($this,'rows'),$arguments);
+		return Arrays::key_on_sub_key($rows, $key);
 	}
 
 	///Key to value formatter (used for where clauses and updates)
