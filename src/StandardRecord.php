@@ -49,10 +49,26 @@ class StandardRecord extends StandardRecordAbstract{
 
 		if($options['initial_record'] && $this->transformers['get']){
 			$options['initial_record'] = $this->transformers['get']($options['initial_record']);
+		}elseif($options['transformed_initial_record']){ # bypass get transformation
+			$options['initial_record'] = $options['transformed_initial_record'];
 		}
 
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
+
+	static function from_initial($initial_record=[], $table=null, $identifier=null){
+		return new static($identifier, $table, ['initial_record'=>$initial_record]);
+	}
+	static function from_transformed($transformed_record=[], $table=null, $identifier=null){
+		return new static($identifier, $table, ['transformed_initial_record'=>$transformed_record]);
+	}
+	static function transform_on_get_apply($row){
+		return static::from_initial()->transformers['get']($row);
+	}
+	static function transform_on_set_apply($row){
+		return static::from_initial()->transformers['set']($row);
+	}
+
 	# utility function to create a new record and return it as this class
 	static function create($table, $record, $db=null, $options=[]){
 		$db = $db ? $db : \Grithin\Db::primary();

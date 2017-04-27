@@ -26,14 +26,6 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 		return $row;
 	}
 
-	static function transform_on_get_apply($row){
-		$dummy = new static(null, ['initial_record'=>[]]);
-		return $dummy->transformers['get']($row);
-	}
-	static function transform_on_set_apply($row){
-		$dummy = new static(null, ['initial_record'=>[]]);
-		return $dummy->transformers['set']($row);
-	}
 
 	# clear `__json` affix from column name
 	public function json_transform_on_get($row){
@@ -74,12 +66,14 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 				$based_changes = $this->transformers['set']($based_changes);
 			}
 			if($based_changes){
-				ppe($based_changes);
 				$this->db->update($this->table, $based_changes, $this->identifier);
 			}
 		}
 
 		return $this->record;
+	}
+	public function record_transformed(){
+		return $this->transformers['set']($this->record);
 	}
 	static function json_columns_extract_by_affix($record){
 		$columns = [];

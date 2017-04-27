@@ -48,6 +48,8 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		# transform initial_record, as thought it were from the database
 		if($options['initial_record'] && $this->transformers['get']){
 			$options['initial_record'] = $this->transformers['get']($options['initial_record']);
+		}elseif($options['transformed_initial_record']){ # bypass get transformation
+			$options['initial_record'] = $options['transformed_initial_record'];
 		}
 
 		# identifier is an id, use the id column (which might not be named `id`)
@@ -57,6 +59,20 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
+
+	static function from_initial($initial_record=[], $identifier=null){
+		return new static($identifier, ['initial_record'=>$initial_record]);
+	}
+	static function from_transformed($transformed_record=[], $identifier=null){
+		return new static($identifier, ['transformed_initial_record'=>$transformed_record]);
+	}
+	static function transform_on_get_apply($row){
+		return static::from_initial()->transformers['get']($row);
+	}
+	static function transform_on_set_apply($row){
+		return static::from_initial()->transformers['set']($row);
+	}
+
 	/*
 	Allow for variable input to be transformed into a record, using the cases of:
 	-	already a record, return it
@@ -73,7 +89,6 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 			if(is_array($thing)){
 				if(array_key_exists(static::$id_column, $thing)){
 					if(count($thing) == 1){
-						ppe('id array');
 						return new static($thing); # identifier array
 					}else{
 						return new static([static::$id_column=>$thing[static::$id_column]], ['initial_record'=>$thing]); # initial record
@@ -86,8 +101,6 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 			}else{
 				throw new Exception('Could not construct from unknown thing');
 			}
-
-
 		}
 	}
 
