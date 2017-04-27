@@ -57,6 +57,40 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
+	/*
+	Allow for variable input to be transformed into a record, using the cases of:
+	-	already a record, return it
+	-	a scalar, use as identifier
+	-	an array without the id_column, use as identifier
+	-	an array with the id column
+		-	if include other keys, use as initial record value
+		-	if only one key, use as identifier
+	*/
+	static function construct_from($thing){
+		if(\Grithin\Tool::is_scalar($thing)){
+			return new static([static::$id_column=>$thing]); # identifier value
+		}else{
+			if(is_array($thing)){
+				if(array_key_exists(static::$id_column, $thing)){
+					if(count($thing) == 1){
+						ppe('id array');
+						return new static($thing); # identifier array
+					}else{
+						return new static([static::$id_column=>$thing[static::$id_column]], ['initial_record'=>$thing]); # initial record
+					}
+				}else{
+					return new static($thing); # identifier array
+				}
+			}elseif($thing instanceof static){
+				return $thing;
+			}else{
+				throw new Exception('Could not construct from unknown thing');
+			}
+
+
+		}
+	}
+
 	# utility function to create a new record and return it as this class
 	static function static_creates($record, $db=null, $options=[]){
 		$db = $db ? $db : \Grithin\Db::primary();

@@ -11,6 +11,8 @@ use \Exception;
 
 abstract class StandardRecordAbstract extends \Grithin\Record{
 	public $transformers = ['get'=>null, 'set'=>null];
+	# To be compatible with the  `StandardRecord`, which requires a instance based `json_mapped_columns`, this variable is thus not static
+	# note, this confines the operations with this class. For normally static functions, it is now necessary to create a dummy instance
 	public $json_mapped_columns = [];
 
 	public function getter($self){
@@ -23,6 +25,17 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 		}
 		return $row;
 	}
+
+	static function transform_on_get_apply($row){
+		$dummy = new static(null, ['initial_record'=>[]]);
+		return $dummy->transformers['get']($row);
+	}
+	static function transform_on_set_apply($row){
+		$dummy = new static(null, ['initial_record'=>[]]);
+		return $dummy->transformers['set']($row);
+	}
+
+	# clear `__json` affix from column name
 	public function json_transform_on_get($row){
 		$decoded = self::static_json_decode($row);
 		if($this->json_mapped_columns){
@@ -38,6 +51,7 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 		}
 		return $decoded;
 	}
+	# add `__json` affix to column name
 	public function json_transform_on_set($changes){
 		$detransformed_changes = (array)$changes;
 		if($this->json_mapped_columns){

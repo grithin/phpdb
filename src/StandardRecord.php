@@ -34,7 +34,7 @@ class StandardRecord extends StandardRecordAbstract{
 
 		#+ handle record transformer options {
 		if($options['transformers']){
-			$this->transformers = Arrays::merge($this->transformers, $options['transformers']);
+			$this->transformers = Arrays::replace($this->transformers, $options['transformers']);
 		}
 		if($this->json_mapped_columns){
 			if(!$this->transformers['get']){
