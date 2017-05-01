@@ -72,7 +72,8 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 
 		return $this->record;
 	}
-	public function record_transformed(){
+	# record as it exists prior to the get transformer
+	public function record_untransformed(){
 		return $this->transformers['set']($this->record);
 	}
 	static function json_columns_extract_by_affix($record){

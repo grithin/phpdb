@@ -60,17 +60,28 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
 
-	static function from_initial($initial_record=[], $identifier=null){
-		return new static($identifier, ['initial_record'=>$initial_record]);
+	static function pseudo_get(){
+		return static::pseudo_from_initial([]);
 	}
-	static function from_transformed($transformed_record=[], $identifier=null){
-		return new static($identifier, ['transformed_initial_record'=>$transformed_record]);
+	static function pseudo_from_initial($initial_record=[]){
+		return static::from_initial($initial_record, null, ['db'=>true]);
+	}
+	static function pseudo_from_transformed($transformed_record=[]){
+		return static::from_transformed($transformed_record, null, ['db'=>true]);
+	}
+	static function from_initial($initial_record=[], $identifier=null, $options=[]){
+		$options = array_merge($options, ['initial_record'=>$initial_record]);
+		return new static($identifier, $options);
+	}
+	static function from_transformed($transformed_record=[], $identifier=null, $options=[]){
+		$options = array_merge($options, ['transformed_initial_record'=>$transformed_record]);
+		return new static($identifier, $options);
 	}
 	static function transform_on_get_apply($row){
-		return static::from_initial()->transformers['get']($row);
+		return static::pseudo_get()->transformers['get']($row);
 	}
 	static function transform_on_set_apply($row){
-		return static::from_initial()->transformers['set']($row);
+		return static::pseudo_get()->transformers['set']($row);
 	}
 
 	/*

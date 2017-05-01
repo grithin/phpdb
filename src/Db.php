@@ -565,6 +565,10 @@ Class Db{
 		return calL_user_func_array([$this,'quoteIdentity'], func_get_args());
 	}
 
+	/// construct where clause prefixed withe `WHERE`
+	protected function where($where){
+		return "\nWHERE ".$this->conditions($where);
+	}
 	/// construct where clause from array or string
 	/**
 	@param	where	various forms:
@@ -574,7 +578,7 @@ Class Db{
 	@return	where string
 	@note if the where clause does not exist, function will just return nothing; this generally leads to an error
 	*/
-	protected function where($where){
+	protected function conditions($where){
 		if(!$where){
 			return;
 		}elseif(is_array($where)){
@@ -587,8 +591,9 @@ Class Db{
 			}
 			$where = 'id = '.$where;
 		}
-		return "\nWHERE ".$where;
+		return $where;
 	}
+
 	///does single query for multiple inserts.  Uses first row as key template
 	protected function intos($command,$table,$rows){
 		//use first row as template
