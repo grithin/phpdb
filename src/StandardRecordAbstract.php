@@ -66,7 +66,9 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 				$based_changes = $this->transformers['set']($based_changes);
 			}
 			if($based_changes){
-				$this->db->update($this->table, $based_changes, $this->identifier);
+				if($this->identifier){
+					$this->db->update($this->table, $based_changes, $this->identifier);
+				}
 			}
 		}
 

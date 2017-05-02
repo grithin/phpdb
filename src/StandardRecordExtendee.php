@@ -64,17 +64,24 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		return static::pseudo_from_initial([]);
 	}
 	static function pseudo_from_initial($initial_record=[]){
-		return static::from_initial($initial_record, null, ['db'=>true]);
+		return static::from_initial($initial_record, false, ['db'=>true]);
 	}
 	static function pseudo_from_transformed($transformed_record=[]){
-		return static::from_transformed($transformed_record, null, ['db'=>true]);
+		return static::from_transformed($transformed_record, false, ['db'=>true]);
 	}
 	static function from_initial($initial_record=[], $identifier=null, $options=[]){
 		$options = array_merge($options, ['initial_record'=>$initial_record]);
+		if($identifier === null){ # identifier as false indicates not to set it.  As null, indicates should pull from record
+			$identifier = [static::$id_column => $initial_record[static::$id_column]];
+		}
 		return new static($identifier, $options);
 	}
 	static function from_transformed($transformed_record=[], $identifier=null, $options=[]){
 		$options = array_merge($options, ['transformed_initial_record'=>$transformed_record]);
+		if($identifier === null){ # identifier as false indicates not to set it.  As null, indicates should pull from record
+			$id_column = static::transform_on_get_apply_to_key(static::$id_column);
+			$identifier = [static::$id_column => $transformed_record[$id_column]];
+		}
 		return new static($identifier, $options);
 	}
 	static function transform_on_get_apply($row){
@@ -82,6 +89,14 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 	}
 	static function transform_on_set_apply($row){
 		return static::pseudo_get()->transformers['set']($row);
+	}
+	# apply transformation to just the key name
+	static function transform_on_get_apply_to_key($key){
+		return array_keys(static::transform_on_get_apply([$key=>null]))[0];
+	}
+	# apply transformation to just the key name
+	static function transform_on_set_apply_to_key($key){
+		return array_keys(static::transform_on_set_apply([$key=>null]))[0];
 	}
 
 	/*
