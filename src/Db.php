@@ -318,18 +318,21 @@ Class Db{
 	}
 
 	protected function applyLimitOne($sql){
+		return self::limit_apply($sql, 1);
+	}
+	protected function limit_apply($sql, $limit){
 		#++ handle prepared statement type sql argument {
 		if(is_array($sql)){
 			$sql = $this->sql_and_variables($sql);
 			if(!self::sql_is_limited($sql[0])){
-				$sql[0] .= "\nLIMIT 1";
+				$sql[0] .= "\nLIMIT ".$limit;
 			}
 			return $sql;
 		}
 		#++ }
 		# handle normal string sql argument {
 		if(!self::sql_is_limited($sql)){
-			$sql .= "\nLIMIT 1";	}
+			$sql .= "\nLIMIT ".$limit;	}
 		return $sql;
 		#++ }
 	}
@@ -786,6 +789,10 @@ Class Db{
 			$select .= "\nLIMIT ".$limit;
 		}
 		return $select;
+	}
+	# alias for `select`
+	protected function sql(){
+		return call_user_func_array([$this, 'select'], func_get_args());
 	}
 //+ helper tools {
 	/// query check if there is a match
