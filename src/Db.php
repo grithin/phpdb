@@ -133,6 +133,9 @@ Class Db{
 	@param	v	the value to be quoted
 	*/
 	protected function quote($v){
+		if(!Tool::is_scalar($v)){
+			$v = (string)$v;
+		}
 		return $this->under->quote($v);
 	}
 	/// return last run sql
@@ -725,6 +728,7 @@ Class Db{
 		if(!$where){
 			Debug::toss('Unqualified update is too risky.  Use 1=1 to verify');
 		}
+
 		$vf=implode(', ',$this->ktvf($update,2));
 		$res = $this->query('UPDATE '.$this->quoteIdentity($table).' SET '.$vf.$this->where($where));
 		return $res->rowCount();
