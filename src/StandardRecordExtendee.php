@@ -130,15 +130,40 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		}
 	}
 
+
+	static function create_from_initial($record, $options=[]){
+		$options['db'] = $options['db'] ? $options['db'] : \Grithin\Db::primary();
+		$id = $options['db']->insert(static::$table, $record);
+		$new_key = [static::$id_column=>$id];
+		$record = array_replace($record, $new_key);
+		return static::from_initial($record, $new_key, $options);
+	}
+	static function create_from_transformed($record, $options=[]){
+		$options['db'] = $options['db'] ? $options['db'] : \Grithin\Db::primary();
+		$record = static::pseudo_from_transformed($record)->record_untransformed();
+		$id = $options['db']->insert(static::$table, $record);
+		$new_key = [static::$id_column=>$id];
+		$record = array_replace($record, $new_key);
+		return static::from_initial($record, $new_key, $options);
+	}
+
 	# utility function to create a new record and return it as this class
-	static function static_creates($record, $db=null, $options=[]){
-		$db = $db ? $db : \Grithin\Db::primary();
+	/* params
+	@record:	[]< raw, untransformed record (json fields must be text) >
+	*/
+	static function static_creates($record, $options=[]){
+		$db = $options['db'] = $options['db'] ? $options['db'] : \Grithin\Db::primary();
 		$id = $db->insert(static::$table, $record);
 		$record[static::$id_column] = $id;
 		$options['db'] = $db;
 		$options['initial_record'] = $record;
 		return new static([static::$id_column => $id], $options);
 	}
+
+	static function static_create_from_transformed(){
+
+	}
+
 	static function json_columns_extract_from_db($db){
 		return self::json_columns_extract_from_db_by_table_and_db(static::$table, $db);
 	}

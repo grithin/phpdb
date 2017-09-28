@@ -57,8 +57,8 @@ class StandardRecord extends StandardRecordAbstract{
 	}
 
 	# utility function to create a new record and return it as this class
-	static function create($table, $record, $db=null, $options=[]){
-		$db = $db ? $db : \Grithin\Db::primary();
+	static function create($table, $record, $options=[]){
+		$db = $options['db'] ? $options['db'] : \Grithin\Db::primary();
 		$id = $db->insert($table, $record);
 		$id_column = $options['id_column'] ? $options['id_column'] : 'id';
 		$record[$id_column] = $id;
