@@ -589,8 +589,6 @@ Class Db{
 			return;
 		}elseif(is_array($where)){
 			$where = implode("\n\tAND ",$this->ktvf($where));
-		}elseif(!$where  && !Tool::isInt($where)){
-			return;
 		}elseif(!preg_match('@[ =<>]@',$where)){//ensures where is not long where string (bob=sue, bob is null), but simple item.
 			if((string)(int)$where != $where){
 				$where = $this->quote($where);
