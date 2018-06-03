@@ -78,6 +78,8 @@ Class Db{
 				}
 			}else{
 				$this->under = new \PDO($this->connectionInfo['dsn'], $this->connectionInfo['user'], $this->connectionInfo['password']);
+				$this->under->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
 			}
 		}catch(\PDOException $e){
 			if($this->connectionInfo['backup']){
@@ -128,15 +130,40 @@ Class Db{
 		$this->last['call'] = [$fnName,$args];
 		return call_user_func_array(array($this,$fnName),$args);
 	}
+
+	public $quote_cache = []; #< since quote with Db function may involve request to Db, to minimize requests, cache these
 	/// returns escaped string with quotes.	Use on values to prevent injection.
 	/**
 	@param	v	the value to be quoted
 	*/
-	protected function quote($v){
+	protected function quote($v, $use_cache=true){
 		if(!Tool::is_scalar($v)){
 			$v = (string)$v;
 		}
+
+		# caching
+		if($use_cache && strlen($v)<=250){ # no reason to expect multiple occurrence of same long text quotes
+			if(!$this->quote_cache[$v]){
+				$this->quote_cache[$v] = $this->under->quote($v);
+			}
+			return $this->quote_cache[$v];
+		}
 		return $this->under->quote($v);
+	}
+	# handles [a-z9-9_] style identities without asking Db to do the quoting
+	protected function quoteIdentity($identity,$separation=true){
+		$quote = $this->quote_style;
+		$identity = $quote.$identity.$quote;
+		#Fields like user.id to "user"."id"
+		if($separation && strpos($identity,'.')!==false){
+			$identity = implode($quote.'.'.$quote,explode('.',$identity));
+		}
+		return $identity;
+	}
+	# the overhead is worth the expectation
+	protected function quote_identity(){
+		$alias = 'quoteIdentity';
+		return calL_user_func_array([$this,$alias], func_get_args());
 	}
 	/// return last run sql
 	protected function lastSql(){
@@ -271,13 +298,13 @@ Class Db{
 		}
 	}
 	protected function retry($function, $arguments){
-		if($this->$reconnecting){
+		if($this->reconnecting){
 			Debug::toss("--DATABASE ERROR--\nNo result, likely connection timeout", 'DbException');
 		}
-		$this->$reconnecting = true;
+		$this->reconnecting = true;
 		$this->load();
 		$return = call_user_func_array([$this, $function], $arguments);
-		$this->$reconnecting = false;
+		$this->reconnecting = false;
 		return $return;
 	}
 
@@ -556,20 +583,7 @@ Class Db{
 		}
 	}
 
-	# handles [a-z9-9_] style identities without asking Db to do the quoting
-	protected function quoteIdentity($identity,$separation=true){
-		$quote = $this->quote_style;
-		$identity = $quote.$identity.$quote;
-		#Fields like user.id to "user"."id"
-		if($separation && strpos($identity,'.')!==false){
-			$identity = implode($quote.'.'.$quote,explode('.',$identity));
-		}
-		return $identity;
-	}
-	# the overhead is worth the expectation
-	protected function quote_identity(){
-		return calL_user_func_array([$this,'quoteIdentity'], func_get_args());
-	}
+
 
 	/// construct where clause prefixed withe `WHERE`
 	protected function where($where){
@@ -893,9 +907,13 @@ Class Db{
 	}
 	//Get database tables
 	protected function tables(){
-		if($this->connectionInfo['driver'] == 'mysql'){
+		$driver = $this->under->getAttribute(\PDO::ATTR_DRIVER_NAME);
+		if($driver == 'mysql'){
 			return $this->column('show tables');
+		}elseif($driver == 'sqlite'){
+			return $this->column('SELECT name FROM sqlite_master WHERE type='.$this->quote('table'));
 		}
+		throw new \Exception('Unsupported driver "'.$driver.'" for function');
 	}
 
 	public $tablesInfo = [];
