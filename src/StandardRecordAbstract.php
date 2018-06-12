@@ -21,7 +21,7 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 			throw new Exception('Getter did not find row in table "'.$this->table.'" on identifier: '.Tool::json_encode($this->identifier));
 		}
 		if($this->transformers['get']){
-			$row = $this->transformers['get']($row);
+			$row = $this->transformers['get']($row, $this);
 		}
 		return $row;
 	}
@@ -63,7 +63,7 @@ abstract class StandardRecordAbstract extends \Grithin\Record{
 			$based_changes = Arrays::pick($this->record, array_keys(Arrays::from($changes)));
 
 			if($this->transformers['set']){
-				$based_changes = $this->transformers['set']($based_changes);
+				$based_changes = $this->transformers['set']($based_changes, $this);
 			}
 			if($based_changes){
 				if($this->identifier){
