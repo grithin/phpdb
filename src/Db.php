@@ -922,7 +922,8 @@ Class Db{
 		if(!$this->tablesInfo[$table]){
 			$columns = array();
 			$keys = array();
-			if($this->connectionInfo['driver'] == 'mysql'){
+			$driver = $this->under->getAttribute(\PDO::ATTR_DRIVER_NAME);
+			if($driver == 'mysql'){
 				//++ get the columns info {
 				$rows = $this->rows('describe '.$this->quoteIdentity($table));
 				foreach($rows as $row){
@@ -944,10 +945,30 @@ Class Db{
 					}
 				}
 				//++ }
+			}elseif($driver == 'sqlite'){
+				$statement = $this->value('SELECT sql FROM sqlite_master WHERE type='.$this->quote('table').' and tbl_name = '.$this->quote($table));
+				if($statement){
+					$info = self::create_statement_parse($statement);
+					$columns = $info['columns'];
+				}
 			}
 			$this->tableInfo[$table] = ['columns'=>$columns,'keys'=>$keys];
 		}
 		return $this->tableInfo[$table];
+	}
+	static function create_statement_parse($statement){
+		preg_match('/create .*?[`"](.*?)[`"].*?\((.*)\)/sim', $statement, $match);
+		$table = $match[1];
+		$content = $match[2];
+		$lines = preg_split('/\n/', $content);
+		$columns = [];
+		foreach($lines as $line){
+			preg_match('/[`"`](.*?)[`"`]([^\n]+)/', $line, $match);
+			if($match){
+				$columns[$match[1]] = ['type'=>self::parseColumnType($match[2])];
+			}
+		}
+		return ['table'=>$table, 'columns'=>$columns];
 	}
 	# the overhead is worth the expectation
 	protected function table_info(){
@@ -958,16 +979,16 @@ Class Db{
 	}
 	//take db specific column type and translate it to general
 	static function parseColumnType($type){
-		$type = preg_replace('@\([^)]*\)@','',$type);
+		$type = trim(strtolower(preg_replace('@\([^)]*\)|,@','',$type)));
 		if(preg_match('@int@i',$type)){//int,bigint
 			return 'int';
 		}elseif(preg_match('@decimal@i',$type)){
 			return 'decimal';
 		}elseif(preg_match('@float@i',$type)){
 			return 'float';
-		}elseif(in_array($type,array('datetime','date','timestamp'))){
+		}elseif(preg_match('@datetime|date|timestamp@i',$type)){
 			return $type;
-		}elseif(in_array($type,array('varchar','text'))){
+		}elseif(preg_match('@varchar|text@i',$type)){
 			return 'text';
 		}
 	}
@@ -1017,4 +1038,33 @@ Class Db{
 	protected function rollback_transaction(){
 		return calL_user_func_array([$this,'rollbackTransaction'], func_get_args());
 	}
+
+	protected function records_copy_over($table_from, $table_to, $where, $options=[]){
+		$defaults = ['type'=>'ignore'];
+		$options = array_merge($defaults, $options);
+
+		$from_columns = $this->column_names($table_from);
+		$to_columns = $this->column_names($table_to);
+		$matching_columns = array_intersect($from_columns, $to_columns);
+
+		$column_list = implode(', ', array_map([$this,'quote_identity'], $matching_columns));
+
+		$driver = $this->under->getAttribute(\PDO::ATTR_DRIVER_NAME);
+		if($driver == 'mysql'){
+			if($options['type']=='ignore'){
+				$type = 'insert ignore';
+			}else{
+				$type = $options['type'];
+			}
+		}elseif($driver == 'sqlite'){
+			if($options['type']=='ignore'){
+				$type = 'insert or ignore';
+			}else{
+				$type = $options['type'];
+			}
+		}
+
+		return $this->query($type.' INTO '.$this->quote_identity($table_to).' ('.$column_list.') select '.$column_list.' from '.$this->quote_identity($table_from).' '.$this->where($where).' ');
+	}
 }
+
