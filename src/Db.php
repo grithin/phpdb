@@ -89,7 +89,8 @@ Class Db{
 			}
 			throw $e;
 		}
-		if($this->under->getAttribute(\PDO::ATTR_DRIVER_NAME)=='mysql'){
+		$this->driver = $this->under->getAttribute(\PDO::ATTR_DRIVER_NAME);
+		if($this->driver=='mysql'){
 			if($this->options['sql_mode'] == 'ANSI'){
 				$this->query('SET SESSION sql_mode=\'ANSI\'');
 				$this->quote_style = '"';
@@ -152,6 +153,12 @@ Class Db{
 	}
 	# handles [a-z9-9_] style identities without asking Db to do the quoting
 	protected function quoteIdentity($identity,$separation=true){
+		if($this->driver == 'sqlite'){ # doesn't appear to accept seperation
+			if(strpos($identity,'.')!==false){
+				# sqlite doesn't handle assigning . quoted columns on results, so just ignore and hope nothing cause syntax error
+				return $identity;
+			}
+		}
 		$quote = $this->quote_style;
 		$identity = $quote.$identity.$quote;
 		#Fields like user.id to "user"."id"
@@ -586,8 +593,12 @@ Class Db{
 
 
 	/// construct where clause prefixed withe `WHERE`
-	protected function where($where){
-		return "\nWHERE ".$this->conditions($where);
+	protected function where($where, $gauranteed_where=true){
+		$conditions_sql = $this->conditions($where);
+
+		if($conditions_sql || $gauranteed_where){
+			return "\nWHERE ".$conditions_sql;
+		}
 	}
 	/// construct where clause from array or string
 	/**
@@ -785,7 +796,7 @@ Class Db{
 		if(is_array($columns)){
 			$columns = implode(', ',array_map([$this,'quoteIdentity'],$columns));
 		}
-		$select = 'SELECT '.$columns."\nFROM ".$from.$this->where($where);
+		$select = 'SELECT '.$columns."\nFROM ".$from.$this->where($where, false);
 		if($order){
 			if(!is_array($order)){
 				$order = Arrays::toArray($order);
@@ -1064,7 +1075,7 @@ Class Db{
 			}
 		}
 
-		return $this->query($type.' INTO '.$this->quote_identity($table_to).' ('.$column_list.') select '.$column_list.' from '.$this->quote_identity($table_from).' '.$this->where($where).' ');
+		return $this->query($type.' INTO '.$this->quote_identity($table_to).' ('.$column_list.') select '.$column_list.' from '.$this->quote_identity($table_from).' '.$this->where($where, false).' ');
 	}
 }
 
