@@ -121,9 +121,19 @@ Class Db{
 		return calL_user_func_array([$this,'makeDsn'], func_get_args());
 	}
 
-	function __toString(){
-		return var_export($this->connectionInfo,true);
+	function public_info(){
+		$info = Arrays::pick($this->connectionInfo, ['driver', 'database', 'host', 'port']);
+		$info['driver'] = $this->driver;
+		$info['class'] = __CLASS__;
+		return $info;
 	}
+	function __toArray(){
+		return $this->public_info();
+	}
+	function __toString(){
+		return var_export($this->public_info(),true);
+	}
+
 	function __testCall($fnName, $args){
 		if(!method_exists($this,$fnName)){
 			Debug::toss(get_called_class().' Method not found: '.$fnName);
@@ -138,6 +148,9 @@ Class Db{
 	@param	v	the value to be quoted
 	*/
 	protected function quote($v, $use_cache=true){
+		if(is_numeric($v)){ # numerics don't need quoting
+			return $v;
+		}
 		if(!Tool::is_scalar($v)){
 			$v = (string)$v;
 		}
@@ -554,6 +567,10 @@ Class Db{
 			return $value;
 		}elseif(is_int($field)){//the key is auto-generated, don't quote
 			return $value;
+		}elseif(is_array($value)){
+			$equator = 'IN';
+			$values = implode(', ', array_map([$this, 'quote'], $value));
+			return self::quoteIdentity($field).' IN ('.$values.')';
 		}else{
 			if($field[0]=='?'){//optional pair, dependent on there being a value
 				if(!$value){
@@ -683,7 +700,12 @@ Class Db{
 	@return	see self::into
 	*/
 	protected function insertIgnore($table,$kvA,$matchKeys=null){
-		return $this->into('INSERT IGNORE',$table,$kvA,'',$matchKeys);
+		if($this->driver == 'sqlite'){
+			$type = 'INSERT OR IGNORE';
+		}else{
+			$type = 'INSERT IGNORE';
+		}
+		return $this->into($type, $table, $kvA, '', $matchKeys);
 	}
 	# the overhead is worth the expectation
 	protected function insert_ignore(){
@@ -718,7 +740,12 @@ Class Db{
 	@return	see Db::into
 	*/
 	protected function replace($table,$kvA,$matchKeys=null){
-		return $this->into('REPLACE',$table,$kvA,'',$matchKeys);
+		if($this->driver == 'sqlite'){
+			$type = 'INSERT OR REPLACE';
+		}else{
+			$type = 'REPLACE';
+		}
+		return $this->into($type,$table,$kvA,'',$matchKeys);
 	}
 
 	/// internal use; perform insert into [called from in(), inUp()]
