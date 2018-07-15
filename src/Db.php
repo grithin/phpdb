@@ -1077,6 +1077,13 @@ Class Db{
 		return calL_user_func_array([$this,'rollbackTransaction'], func_get_args());
 	}
 
+	protected function lock_create($name, $options=[]){
+		# assume this indirect use is simple and intends for lock to be released before/at end of script
+		$options = array_merge(['unlock_on_exit'=>true], $options);
+		return new DbLock($db, $name, $options);
+	}
+
+
 	protected function records_copy_over($table_from, $table_to, $where, $options=[]){
 		$defaults = ['type'=>'ignore'];
 		$options = array_merge($defaults, $options);
