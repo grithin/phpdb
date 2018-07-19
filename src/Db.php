@@ -1080,7 +1080,7 @@ Class Db{
 	protected function lock_create($name, $options=[]){
 		# assume this indirect use is simple and intends for lock to be released before/at end of script
 		$options = array_merge(['unlock_on_exit'=>true], $options);
-		return new DbLock($db, $name, $options);
+		return new DbLock($this, $name, $options);
 	}
 
 
