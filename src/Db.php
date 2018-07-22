@@ -284,6 +284,26 @@ Class Db{
 		}
 		return [$sql, $variables];
 	}
+	# Combine where conditional sets with AND
+	/* Params
+	[
+		[< sql > , < vars >],
+		...
+	]
+	*/
+	static function compile_where_sets($sets){
+		$flat = [];
+		if($sets){
+			$first = array_shift($sets);
+			$flat[] = $first[0];
+			$flat[] = $first[1];
+			foreach($sets as $set){
+				$flat[] = ' AND '.$set[0];
+				$flat[] = $set[1];
+			}
+		}
+		return $flat;
+	}
 	# runs self::sql_and_variables, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
 	protected function prepare(){
 		list($sql, $variables) = call_user_func_array([$this, 'sql_and_variables'], func_get_args());
