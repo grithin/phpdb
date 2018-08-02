@@ -118,7 +118,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	function make_dsn(){
-		return calL_user_func_array([$this,'makeDsn'], func_get_args());
+		return call_user_func_array([$this,'makeDsn'], func_get_args());
 	}
 
 	function public_info(){
@@ -183,7 +183,7 @@ Class Db{
 	# the overhead is worth the expectation
 	protected function quote_identity(){
 		$alias = 'quoteIdentity';
-		return calL_user_func_array([$this,$alias], func_get_args());
+		return call_user_func_array([$this,$alias], func_get_args());
 	}
 	/// return last run sql
 	protected function lastSql(){
@@ -195,7 +195,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function last_sql(){
-		return calL_user_func_array([$this,'lastSql'], func_get_args());
+		return call_user_func_array([$this,'lastSql'], func_get_args());
 	}
 	/// perform database query
 	/**
@@ -215,7 +215,10 @@ Class Db{
 
 		if(is_a($sql, \PDOStatement::class)){
 			$this->last['sql'] = [$sql->queryString, $sql->variables];
-			$success = $sql->execute($sql->variables);
+			try{
+				$success = $sql->execute($sql->variables);
+			}catch(\Exception $e){}
+
 			if(!$success){
 				$this->handle_error($sql);
 			}
@@ -420,6 +423,7 @@ Class Db{
 	@warning "limit 1" is appended to the sql input
 	@return	one column
 	*/
+	#@note	returns `false` if no match
 	protected function value(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		#function implies only 1 retured row
@@ -444,6 +448,7 @@ Class Db{
 	-	prepared statement: $x = Db::row(['select * from inquiry where id = ?',[7]]);
 	-	table and dictionary: #$x = Db::row('inquiry', ['id'=>7]);
 	*/
+	#@note	returns `false` if no match
 	protected function row(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		#function implies only 1 retured row
@@ -459,6 +464,7 @@ Class Db{
 	/**See class note for input
 	@return	a sequential array of rows
 	*/
+	#@note	returns `[]` if no match
 	protected function rows($sql){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		return $this->as_rows($this->query($sql));
@@ -477,7 +483,7 @@ Class Db{
 	protected function all($table){
 		$args = func_get_args();
 		array_splice($args, 1, 0, '1=1');
-		return calL_user_func_array([$this,'rows'], $args);
+		return call_user_func_array([$this,'rows'], $args);
 	}
 
 	/// query returning a column
@@ -549,7 +555,7 @@ Class Db{
 	}
 	# alias; the overhead is worth the expectation
 	protected function column_key(){
-		return calL_user_func_array([$this,'columnKey'], func_get_args());
+		return call_user_func_array([$this,'columnKey'], func_get_args());
 	}
 
 	protected function rows_by_column($key, $sql){
@@ -749,7 +755,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function insert_update(){
-		return calL_user_func_array([$this,'insertUpdate'], func_get_args());
+		return call_user_func_array([$this,'insertUpdate'], func_get_args());
 	}
 
 	/// replace on a table
@@ -910,7 +916,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function named_id(){
-		return calL_user_func_array([$this,'namedId'], func_get_args());
+		return call_user_func_array([$this,'namedId'], func_get_args());
 	}
 
 	/// perform a count and select rows; doesn't work with all sql
@@ -961,7 +967,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function table_exists(){
-		return calL_user_func_array([$this,'tableExists'], func_get_args());
+		return call_user_func_array([$this,'tableExists'], func_get_args());
 	}
 	//Get database tables
 	protected function tables(){
@@ -1030,7 +1036,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function table_info(){
-		return calL_user_func_array([$this,'tableInfo'], func_get_args());
+		return call_user_func_array([$this,'tableInfo'], func_get_args());
 	}
 	protected function column_names($table){
 		return array_keys($this->table_info($table)['columns']);
@@ -1078,7 +1084,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function start_transaction(){
-		return calL_user_func_array([$this,'startTransaction'], func_get_args());
+		return call_user_func_array([$this,'startTransaction'], func_get_args());
 	}
 	# to exit a transaction, you either commit it or roll it back
 	protected function commitTransaction(){
@@ -1086,7 +1092,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function commit_transaction(){
-		return calL_user_func_array([$this,'commitTransaction'], func_get_args());
+		return call_user_func_array([$this,'commitTransaction'], func_get_args());
 	}
 	# to exit a transaction, you either commit it or roll it back
 	protected function rollbackTransaction(){
@@ -1094,7 +1100,7 @@ Class Db{
 	}
 	# the overhead is worth the expectation
 	protected function rollback_transaction(){
-		return calL_user_func_array([$this,'rollbackTransaction'], func_get_args());
+		return call_user_func_array([$this,'rollbackTransaction'], func_get_args());
 	}
 
 	protected function lock_create($name, $options=[]){
