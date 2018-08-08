@@ -10,6 +10,12 @@
             "email": "bob_bf2@deemit.com"
         }
     ],
+	 "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://repos.clrmo.com/root/phpbase.git"
+        }
+    ],
     "require": {
         "php": ">=5.5.9",
         "ext-pdo": "*",
