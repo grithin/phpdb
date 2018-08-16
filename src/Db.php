@@ -237,7 +237,8 @@ Class Db{
 	}
 
 	/* In allowance for the common use of accumluation of mixed wheres of SQL and variable dictionaries
-	Examples
+
+	Can use `:x` or `?`
 	-	(
 			['select * from user where id = :id',
 			[':id'=>1]]
@@ -252,6 +253,16 @@ Class Db{
 			['select * from user where id = ?',
 			[1]]
 		);
+
+	Can use single array as all arguments or expand into arguments
+	-	(
+			[
+				'select * from user where id = ?',
+				[1],
+				'and id2 = ?',
+				[1]
+			]
+		);
 	-	(
 			'select * from','user where id = ?',
 			[1],
@@ -260,6 +271,12 @@ Class Db{
 		);
 
 	@NOTE	no attempt to prefix dictionary keys with `:` since a statement with `where id = :id` will accept either [':id'=>1] or ['id'=>1]
+	@NOTE on nulls: `null` is properly filled, but still will not work in conventional parts:
+		`['id is ?', [null]]` works
+		`['id = ?', [null]]` works, but fails to find anything
+		`['id in (?)', [null]]` works, but fails to find anything
+		-	for lists including null, must separate:
+			`['id in (?, ?) or id is ?', [1, 2, null]]`
 	*/
 	protected function sql_and_variables(){
 		$args = func_get_args();
@@ -738,7 +755,7 @@ Class Db{
 		return calL_user_func_array([$this,'insertIgnore'], func_get_args());
 	}
 	/// insert into table; on duplicate key update
-	/**
+	/*
 	@param	table	table to insert on
 	@param	kva	see self::kvf() function
 	@param	update	either plain sql or null; if null, defaults to updating all values to $kvA input
@@ -759,7 +776,7 @@ Class Db{
 	}
 
 	/// replace on a table
-	/**
+	/*
 	@param	table	table to replace on
 	@param	kva	see self::kvf() function
 	@param	matchKeys	keys used to identify row to get the id
@@ -775,7 +792,7 @@ Class Db{
 	}
 
 	/// internal use; perform insert into [called from in(), inUp()]
-	/**
+	/*
 	@note	insert ignore and insert update do not return a row id, so, if the id is not provided and the matchKeys are not provided, may not return row id
 	@return will attempt to get row id, otherwise will return count of affected rows
 	*/
@@ -794,7 +811,7 @@ Class Db{
 	}
 
 	/// perform update, returns number of affected rows
-	/**
+	/*
 	@param	table	table to update
 	@param	update	see self::ktvf() function
 	@param	where	see self::where() function
@@ -811,7 +828,7 @@ Class Db{
 	}
 
 	/// perform delete
-	/**
+	/*
 	@param	table	table to replace on
 	@param	where	see self::where() function
 	@return	row count
@@ -825,7 +842,7 @@ Class Db{
 	}
 
 	///generate sql
-	/**
+	/*
 	Ex:
 		- row('select * from user where id = 20') vs row('user',20);
 		- rows('select name from user where id > 20') vs sRows('user',array('id?>'=>20),'name')
