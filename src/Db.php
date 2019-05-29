@@ -180,7 +180,7 @@ Class Db{
 		}
 		return $identity;
 	}
-	# the overhead is worth the expectation
+	# alias
 	protected function quote_identity(){
 		$alias = 'quoteIdentity';
 		return call_user_func_array([$this,$alias], func_get_args());
@@ -303,6 +303,52 @@ Class Db{
 			}
 		}
 		return [$sql, $variables];
+	}
+
+	# Combined psqls (`[< sql >, < variables >]`) into a single psql
+	/* params
+	< psqls > [
+			(< psql > | < sql >), ...
+		]
+	< combine > < "" | "OR" | "AND" > < the way to combined the SQL string >
+	*/
+	/* definitions
+	psql: [
+			< sql >
+			< variables > [
+				< variable >, ...
+			]
+		]
+	*/
+	static function psql_combine($psqls, $combine = ''){
+		$combine = ' '.$combine.' ';
+		$sqls = [];
+		$vars = [];
+		foreach($psqls as $set){
+			if(is_array($set)){
+				$sqls[] = ' '.$set[0];
+				$vars = array_merge($vars, $set[1]);
+			}else{
+				$sqls[] = ' '.$set;
+			}
+		}
+
+		return [implode($combine, $sqls), $vars];
+	}
+	/* About
+		take `(set, set, set)` and combine into `set` where set is in one of the follow forms:
+		-	[< sql >, < vars >]
+			-	"psql" (prepared SQL) format
+		-	< sql >
+
+		If only one argument and that argument is an array, it will expand that array to represent the sequential arguments
+	*/
+	static function sql_and_variable_sets_combine(){
+		$args = func_get_args();
+		if(count($args) == 1 && is_arra($args[0])){
+			$args = $args[0];
+		}
+		return self::psql_combine($args);
 	}
 	# Combine where conditional sets with AND
 	/* Params
@@ -683,7 +729,15 @@ Class Db{
 		return $where;
 	}
 
-	///does single query for multiple inserts.  Uses first row as key template
+	# does single query for multiple inserts.  Uses first row as key template
+	/* params
+	< command > < SQL insert command, like "INSERT" or "REPLACE" >
+	< table > < the db table name >
+	< rows > {
+			< column_name > : < value >
+			...
+		}
+	*/
 	protected function intos($command,$table,$rows){
 		//use first row as template
 		list($keys) = self::kvp($rows[0]);
@@ -900,6 +954,13 @@ Class Db{
 		$sql = $this->select($table,$where,'1');
 		return $this->value($sql) ? true : false;
 	}
+	# alias for "check"
+	protected function exists($table, $where){
+		$alias = 'check';
+		return call_user_func_array([$this,$alias], func_get_args());
+	}
+
+
 
 	/// get the id of some row, or make it if the row doesn't exist
 	/**
@@ -1155,4 +1216,3 @@ Class Db{
 		return $this->query($type.' INTO '.$this->quote_identity($table_to).' ('.$column_list.') select '.$column_list.' from '.$this->quote_identity($table_from).' '.$this->where($where, false).' ');
 	}
 }
-
