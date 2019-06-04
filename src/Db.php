@@ -236,73 +236,34 @@ Class Db{
 		return $this->result;
 	}
 
-	/* In allowance for the common use of accumluation of mixed wheres of SQL and variable dictionaries
-
-	Can use `:x` or `?`
-	-	(
-			['select * from user where id = :id',
-			[':id'=>1]]
-		);
-	-	(
-			'select * from','user where id = :id',
-			[':id'=>1],
-			'and id2 = :id2',
-			[':id2'=>1]
-		);
-	-	(
-			['select * from user where id = ?',
-			[1]]
-		);
-
-	Can use single array as all arguments or expand into arguments
-	-	(
-			[
-				'select * from user where id = ?',
-				[1],
-				'and id2 = ?',
-				[1]
-			]
-		);
-	-	(
-			'select * from','user where id = ?',
-			[1],
-			'and id2 = ?',
-			[1]
-		);
-
-	@NOTE	no attempt to prefix dictionary keys with `:` since a statement with `where id = :id` will accept either [':id'=>1] or ['id'=>1]
-	@NOTE on nulls: `null` is properly filled, but still will not work in conventional parts:
-		`['id is ?', [null]]` works
-		`['id = ?', [null]]` works, but fails to find anything
-		`['id in (?)', [null]]` works, but fails to find anything
-		-	for lists including null, must separate:
-			`['id in (?, ?) or id is ?', [1, 2, null]]`
+	# Conform some inptu to a psql
+	/* params
+	< input >
+		< sql string >
+		|
+		[ (< sql string > | < variables >), ... ]
 	*/
-	protected function sql_and_variables(){
-		$args = func_get_args();
-		if(count($args) == 1 && is_array($args[0])){
-			$args = $args[0];
-		}
-
-		$sql = [];
-		$variables = [];
-		foreach($args as $v){
-			if(is_array($v)){
-				$variables = array_merge($variables, $v);
-			}else{
-				$sql[] = $v;
+	static function psql($input, $combine = "\n"){
+		if(is_string($input)){
+			return [$input, []];
+		}elseif(is_array($input)){
+			$sql = [];
+			$variables = [];
+			foreach($input as $v){
+				if(is_string($v)){
+					$sql[] = $v;
+				}else{
+					if(!is_array($v)){
+						throw new \Exception('Non-conforming psql input');
+					}
+					$variables = array_merge($variables, $v);
+				}
 			}
+			$sql = implode($combine, $sql);
+			return [$sql, $variables];
+		}else{
+			throw new \Exception('Unrecognized input');
 		}
-		$sql = implode("\n", $sql);
-		# ensure no non-scalar variables
-
-		foreach($variables as $variable){
-			# if this is a non-scalar and does not have a __toString method, error
-			if(!Tool::is_scalar($variable) &&  ! (is_object($variable) && method_exists($variable, '__toString')) ){
-				throw new \Exception('Non scalar SQL statement variable: '.var_export($variable, true));
-			}
-		}
-		return [$sql, $variables];
 	}
 
 	# Combined psqls (`[< sql >, < variables >]`) into a single psql
@@ -320,59 +281,75 @@ Class Db{
 			]
 		]
 	*/
-	static function psql_combine($psqls, $combine = ''){
-		$combine = ' '.$combine.' ';
-		$sqls = [];
-		$vars = [];
-		foreach($psqls as $set){
-			if(is_array($set)){
-				$sqls[] = ' '.$set[0];
-				$vars = array_merge($vars, $set[1]);
-			}else{
-				$sqls[] = ' '.$set;
+
+	/* notes
+	-	Can use `:x` or `?`
+	-	function does not prefix dictionary keys with `:` since a statement with `where id = :id` will accept either [':id'=>1] or ['id'=>1]
+	-	on nulls: `null` is properly filled, but still will not work in conventional parts:
+		`['id is ?', [null]]` works
+		`['id = ?', [null]]` works, but fails to find anything
+		`['id in (?)', [null]]` works, but fails to find anything
+		-	for lists including null, must separate:
+			`['id in (?, ?) or id is ?', [1, 2, null]]`
+	*/
+	/* Example: combining wheres
+	(	[psql, psql], ' AND ' 	)
+	*/
+	static function psqls($psqls, $combine="\n"){
+		$sql = [];
+		$variables = [];
+		foreach($psqls as $psql){
+			list($psql_sql, $psql_variables) = self::psql($psql);
+			if($psql_sql){
+				$sql[] = $psql_sql;
+			}
+			if($psql_variables){
+				$variables = array_merge($variables, $psql_variables);
 			}
 		}
+		$sql = implode($combine, $sql);
+		# ensure no non-scalar variables
 
-		return [implode($combine, $sqls), $vars];
+		foreach($variables as $variable){
+			# if this is a non-scalar and does not have a __toString method, error
+			if(!Tool::is_scalar($variable) &&  ! (is_object($variable) && method_exists($variable, '__toString')) ){
+				throw new \Exception('Non scalar SQL statement variable: '.var_export($variable, true));
+			}
+		}
+		return [$sql, $variables];
 	}
-	/* About
-		take `(set, set, set)` and combine into `set` where set is in one of the follow forms:
-		-	[< sql >, < vars >]
-			-	"psql" (prepared SQL) format
-		-	< sql >
 
-		If only one argument and that argument is an array, it will expand that array to represent the sequential arguments
-	*/
+	# Generally used for combining WHERE psql sets
+	static function psqls_anded($psqls){
+		return self::psqls($psqls, "\n\tAND ");
+	}
+
+	# @deprecated, use psqls
+	static function compile_where_sets($sets){
+		return self::psqls_anded($sets);
+	}
+
+	# @deprecated, use psqls
+	static function sql_and_variables(){
+		return call_user_func_array([self, 'psqls'], [func_get_args()]);
+	}
+
+	# @deprecated, use psqls
+	static function psql_combine($psqls, $combine = ''){
+		return call_user_func_array([self, 'psqls'], func_get_args());
+	}
+	# @deprecated, use psqls
 	static function sql_and_variable_sets_combine(){
 		$args = func_get_args();
-		if(count($args) == 1 && is_arra($args[0])){
+		if(count($args) == 1 && is_array($args[0])){
 			$args = $args[0];
 		}
-		return self::psql_combine($args);
+		return call_user_func_array([self, 'psqls'], $args);
 	}
-	# Combine where conditional sets with AND
-	/* Params
-	[
-		[< sql > , < vars >],
-		...
-	]
-	*/
-	static function compile_where_sets($sets){
-		$flat = [];
-		if($sets){
-			$first = array_shift($sets);
-			$flat[] = $first[0];
-			$flat[] = $first[1];
-			foreach($sets as $set){
-				$flat[] = ' AND '.$set[0];
-				$flat[] = $set[1];
-			}
-		}
-		return $flat;
-	}
-	# runs self::sql_and_variables, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
+
+	# runs self::psqls, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
 	protected function prepare(){
-		list($sql, $variables) = call_user_func_array([$this, 'sql_and_variables'], func_get_args());
+		list($sql, $variables) = call_user_func_array([$this, 'psqls'], [func_get_args()]);
 
 		if($this->result){
 			$this->result->closeCursor();
@@ -459,7 +436,7 @@ Class Db{
 	protected function limit_apply($sql, $limit){
 		#++ handle prepared statement type sql argument {
 		if(is_array($sql)){
-			$sql = $this->sql_and_variables($sql);
+			$sql = $this->psqls($sql);
 			if(!self::sql_is_limited($sql[0])){
 				$sql[0] .= "\nLIMIT ".$limit;
 			}
