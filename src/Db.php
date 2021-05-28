@@ -331,12 +331,12 @@ Class Db{
 
 	# @deprecated, use psqls
 	static function sql_and_variables(){
-		return call_user_func([self, 'psqls'], func_get_args());
+		return call_user_func([__CLASS__, 'psqls'], func_get_args());
 	}
 
 	# @deprecated, use psqls
 	static function psql_combine($psqls, $combine = ''){
-		return call_user_func([self, 'psqls'], $psqls, $combine);
+		return call_user_func([__CLASS__, 'psqls'], $psqls, $combine);
 	}
 	# @deprecated, use psqls
 	static function sql_and_variable_sets_combine(){
@@ -344,7 +344,7 @@ Class Db{
 		if(count($args) == 1 && is_array($args[0])){
 			$args = $args[0];
 		}
-		return call_user_func([self, 'psqls'], $args);
+		return call_user_func([__CLASS__, 'psqls'], $args);
 	}
 
 	# runs self::psqls, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
