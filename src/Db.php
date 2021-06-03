@@ -831,7 +831,7 @@ Class Db{
 		$res = $this->query($type.' INTO '.$this->quoteIdentity($table).$this->kvf($kvA).$update);
 		if($this->under->lastInsertId()){
 			return $this->under->lastInsertId();
-		}elseif($kvA['id']){
+		}elseif(!empty($kvA['id'])){
 			return $kvA['id'];
 		}elseif($matchKeys){
 			$matchKva = Arrays::extract($matchKeys,$kvA);
@@ -1113,7 +1113,7 @@ Class Db{
 	}
 	static function parseColumnLimit($type){
 		preg_match('@\(([0-9,]+)\)@',$type,$match);
-		if($match[1]){
+		if(!empty($match[1])){
 			$limit = explode(',',$match[1]);
 			return $limit[0];
 		}

@@ -48,7 +48,7 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		# transform initial_record, as thought it were from the database
 		if($options['initial_record'] && $this->transformers['get']){
 			$options['initial_record'] = $this->transformers['get']($options['initial_record']);
-		}elseif($options['transformed_initial_record']){ # bypass get transformation
+		}elseif(!empty($options['transformed_initial_record'])){ # bypass get transformation
 			$options['initial_record'] = $options['transformed_initial_record'];
 		}
 

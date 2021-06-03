@@ -28,12 +28,12 @@ class StandardRecord extends StandardRecordAbstract{
 		$this->table = $table;
 
 
-		if($options['json_mapped_columns']){
+		if(!empty($options['json_mapped_columns'])){
 			$this->json_mapped_columns = $options['json_mapped_columns'];
 		}
 
 		#+ handle record transformer options {
-		if($options['transformers']){
+		if(!empty($options['transformers'])){
 			$this->transformers = Arrays::replace($this->transformers, $options['transformers']);
 		}
 		if($this->json_mapped_columns){
@@ -49,7 +49,7 @@ class StandardRecord extends StandardRecordAbstract{
 
 		if($options['initial_record'] && $this->transformers['get']){
 			$options['initial_record'] = $this->transformers['get']($options['initial_record']);
-		}elseif($options['transformed_initial_record']){ # bypass get transformation
+		}elseif(!empty($options['transformed_initial_record'])){ # bypass get transformation
 			$options['initial_record'] = $options['transformed_initial_record'];
 		}
 
