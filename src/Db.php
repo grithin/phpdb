@@ -905,7 +905,7 @@ Class Db{
 			$orders = array();
 			foreach($order as $part){
 				$part = explode(' ',$part);
-				if(!$part[1]){
+				if(empty($part[1])){
 					$part[1] = 'ASC';
 				}
 				//'"' works with functions like "sum(cost)"
@@ -1124,7 +1124,7 @@ Class Db{
 		if(!$this->indices[$table]){
 			$rows = $this->rows('show indexes in '.$this->quoteIdentity($table));
 			foreach($rows as $row){
-				if(!$keys[$row['Key_name']]){
+				if(empty($keys[$row['Key_name']])){
 					$keys[$row['Key_name']] = ['unique'=>!(bool)$row['Non_unique']];
 				}
 				$keys[$row['Key_name']]['columns'][$row['Seq_in_index']] = $row['Column_name'];
