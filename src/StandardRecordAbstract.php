@@ -1,4 +1,4 @@
-<?
+<?php
 /* About
 \Grithin\Record that uses Db and transformers (like for handling __json columns)
 

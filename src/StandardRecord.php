@@ -1,4 +1,4 @@
-<?
+<?php
 /* About
 Generic instance use of StandardRecordAbstract
 */
