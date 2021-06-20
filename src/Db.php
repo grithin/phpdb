@@ -45,7 +45,7 @@ use Grithin\Debug;
 */
 
 Class Db{
-	use \Grithin\SDLL;
+	use \Grithin\Traits\SDLL;
 	/// latest result set returning from $db->query()
 	public $result;
 	/// last method call, args, and last sql thing (which might be SQL string + variables, or just SQL string). Ex  [call:[fn,args],sql:sql]

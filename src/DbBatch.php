@@ -4,7 +4,7 @@ use Grithin\Db;
 use Grithin\Debug;
 ///for getting and putting batches
 class DbBatch implements \Iterator{
-	use \Grithin\testCall;
+	use \Grithin\Traits\testCall;
 	public $position, $step;
 	public $sql;
 	public $currentRows = array();
