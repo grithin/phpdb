@@ -588,9 +588,11 @@ Class Db{
 		array_shift($arguments);
 		$rows = call_user_func_array(array($this,'rows'),$arguments);
 		if(is_array($key)){
-			return Arrays::subsOnKey($rows,$key['key'] ? $key['key'] : $key[0], $key['value'] ? $key['value'] : $key[1]);
+			$key_name = $key['key'] ? $key['key'] : $key[0];
+			$only_value = $key['value'] ? $key['value'] : $key[1];
+			return Arrays::key_on_sub_key_to_remaining($rows, $key_name, ['only'=>$only_value]);
 		}else{
-			return Arrays::subsOnKey($rows,$key);
+			return Arrays::key_on_sub_key($rows, $key);
 		}
 	}
 	# alias; the overhead is worth the expectation
