@@ -962,7 +962,7 @@ Class Db{
 		@param	dict	dictionary to update on query
 	*/
 	protected function namedId($table,$name,&$dict=null){
-		if(Tool::isInt($name)){
+		if(Tool::is_int($name)){
 			return $name;
 		}
 		$id = $this->value($table,['name'=>$name],'id');

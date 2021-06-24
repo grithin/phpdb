@@ -53,7 +53,7 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		}
 
 		# identifier is an id, use the id column (which might not be named `id`)
-		if(Tool::isInt($identifier)){
+		if(Tool::is_int($identifier)){
 			$identifier = [static::$id_column => $identifier];
 		}
 
