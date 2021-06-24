@@ -46,14 +46,14 @@ use Grithin\Debug;
 
 Class Db{
 	use \Grithin\Traits\SDLL;
-	/// latest result set returning from $db->query()
+	/** latest result set returning from $db->query() */
 	public $result;
-	/// last method call, args, and last sql thing (which might be SQL string + variables, or just SQL string). Ex  [call:[fn,args],sql:sql]
+	/** last method call, args, and last sql thing (which might be SQL string + variables, or just SQL string). Ex  [call:[fn,args],sql:sql] */
 	public $last;
-	/// boolean indicating whether the last statement failed, and currently attempting to reconnect to database and run again
+	/** boolean indicating whether the last statement failed, and currently attempting to reconnect to database and run again */
 	public $reconnecting = false;
 
-	/*
+	/**
 	@param	connectionInfo	{driver:, database:, host:, user:, password:,}
 	@param	options	{
 			loader: < external loader function that returns a PDO instance and is given params ($dsn, $user, $password)  >
@@ -100,13 +100,13 @@ Class Db{
 			#$this->under->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
 		}
 	}
-	# load db with existing pdo instance
+	/** load db with existing pdo instance */
 	function with_pdo($pdo){
 		$this->loaded = true;
 		$this->under = $pdo;
 		return $this;
 	}
-	# load db with separate loader
+	/** load db with separate loader */
 	function with_loader($loader){
 		$this->options['loader'] = $loader;
 		return $this;
@@ -116,7 +116,7 @@ Class Db{
 		$connectionInfo['port'] = $connectionInfo['port'] ? $connectionInfo['port'] : '3306';
 		return $connectionInfo['driver'].':dbname='.$connectionInfo['database'].';host='.$connectionInfo['host'].';port='.$connectionInfo['port'];
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	function make_dsn(){
 		return call_user_func_array([$this,'makeDsn'], func_get_args());
 	}
@@ -143,7 +143,7 @@ Class Db{
 	}
 
 	public $quote_cache = []; #< since quote with Db function may involve request to Db, to minimize requests, cache these
-	/// returns escaped string with quotes.	Use on values to prevent injection.
+	/** returns escaped string with quotes.	Use on values to prevent injection. */
 	/**
 	@param	v	the value to be quoted
 	*/
@@ -164,7 +164,7 @@ Class Db{
 		}
 		return $this->under->quote($v);
 	}
-	# handles [a-z9-9_] style identities without asking Db to do the quoting
+	/** handles [a-z9-9_] style identities without asking Db to do the quoting */
 	protected function quoteIdentity($identity,$separation=true){
 		if($this->driver == 'sqlite'){ # doesn't appear to accept seperation
 			if(strpos($identity,'.')!==false){
@@ -180,12 +180,12 @@ Class Db{
 		}
 		return $identity;
 	}
-	# alias
+	/** alias */
 	protected function quote_identity(){
 		$alias = 'quoteIdentity';
 		return call_user_func_array([$this,$alias], func_get_args());
 	}
-	/// return last run sql
+	/** return last run sql */
 	protected function lastSql(){
 		if(!is_string($this->last['sql'])){
 			return json_encode($this->last['sql']);
@@ -193,11 +193,11 @@ Class Db{
 			return $this->last['sql'];
 		}
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function last_sql(){
 		return call_user_func_array([$this,'lastSql'], func_get_args());
 	}
-	/// perform database query
+	/** perform database query */
 	/**
 	@param	sql	the sql to be run
 	@return the executred PDOStatement object
@@ -236,8 +236,8 @@ Class Db{
 		return $this->result;
 	}
 
-	# Conform some inptu to a psql
-	/* params
+	/** Conform some inptu to a psql */
+	/** params
 	< input >
 		< sql string >
 		|
@@ -266,14 +266,14 @@ Class Db{
 		}
 	}
 
-	# Combined psqls (`[< sql >, < variables >]`) into a single psql
-	/* params
+	/** Combined psqls (`[< sql >, < variables >]`) into a single psql */
+	/** params
 	< psqls > [
 			(< psql > | < sql >), ...
 		]
 	< combine > < "" | "OR" | "AND" > < the way to combined the SQL string >
 	*/
-	/* definitions
+	/** definitions
 	psql: [
 			< sql >
 			< variables > [
@@ -282,7 +282,7 @@ Class Db{
 		]
 	*/
 
-	/* notes
+	/** notes
 	-	Can use `:x` or `?`
 	-	function does not prefix dictionary keys with `:` since a statement with `where id = :id` will accept either [':id'=>1] or ['id'=>1]
 	-	on nulls: `null` is properly filled, but still will not work in conventional parts:
@@ -292,7 +292,7 @@ Class Db{
 		-	for lists including null, must separate:
 			`['id in (?, ?) or id is ?', [1, 2, null]]`
 	*/
-	/* Example: combining wheres
+	/** Example: combining wheres
 	(	[psql, psql], ' AND ' 	)
 	*/
 	static function psqls($psqls, $combine="\n"){
@@ -319,26 +319,26 @@ Class Db{
 		return [$sql, $variables];
 	}
 
-	# Generally used for combining WHERE psql sets
+	/** Generally used for combining WHERE psql sets */
 	static function psqls_anded($psqls){
 		return self::psqls($psqls, "\n\tAND ");
 	}
 
-	# @deprecated, use psqls
+	/** @deprecated, use psqls */
 	static function compile_where_sets($sets){
 		return self::psqls_anded($sets);
 	}
 
-	# @deprecated, use psqls
+	/** @deprecated, use psqls */
 	static function sql_and_variables(){
 		return call_user_func([__CLASS__, 'psqls'], func_get_args());
 	}
 
-	# @deprecated, use psqls
+	/** @deprecated, use psqls */
 	static function psql_combine($psqls, $combine = ''){
 		return call_user_func([__CLASS__, 'psqls'], $psqls, $combine);
 	}
-	# @deprecated, use psqls
+	/** @deprecated, use psqls */
 	static function sql_and_variable_sets_combine(){
 		$args = func_get_args();
 		if(count($args) == 1 && is_array($args[0])){
@@ -347,7 +347,7 @@ Class Db{
 		return call_user_func([__CLASS__, 'psqls'], $args);
 	}
 
-	# runs self::psqls, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement
+	/** runs self::psqls, creats a PDOStatement, sets a custom `variables` attribute of the PDOStatement object, returning that PDOStatement */
 	protected function prepare(){
 		list($sql, $variables) = call_user_func([$this, 'psqls'], func_get_args());
 
@@ -366,7 +366,7 @@ Class Db{
 		$prepared->variables = $variables; # custom attribute for later binding
 		return $prepared;
 	}
-	/*
+	/**
 		PDOStatement and PDO object both have `errorCode` and `errorInfo`, and a statement may have an error without showing up in the PDO object.
 	*/
 	protected function handle_error($errorable=null, $additional_info=false){
@@ -391,9 +391,9 @@ Class Db{
 		return $return;
 	}
 
-	/// Used for prepared statements, returns raw PDO result
-	// Ex: $db->as_rows($db->exec('select * from languages where id = :id', [':id'=>181])
-	/*
+	/** Used for prepared statements, returns raw PDO result */
+	/** Ex: $db->as_rows($db->exec('select * from languages where id = :id', [':id'=>181]) */
+	/**
 
 	@return	executed PDOStatement
 
@@ -407,7 +407,7 @@ Class Db{
 	}
 
 
-	/// Used internally.	Checking number of arguments for functionality
+	/** Used internally.	Checking number of arguments for functionality */
 	protected function getOverloadedSql($expected, $actual){
 		$count = count($actual);
 		$overloaded = $count - $expected;
@@ -458,12 +458,12 @@ Class Db{
 	}
 
 
-	/// query returning a column value
+	/** query returning a column value */
 	/**See class note for input
 	@warning "limit 1" is appended to the sql input
 	@return	one column
 	*/
-	#@note	returns `false` if no match
+	/**@note	returns `false` if no match */
 	protected function value(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		#function implies only 1 retured row
@@ -476,7 +476,7 @@ Class Db{
 		return	$res->fetchColumn();
 	}
 
-	/// query returning a row
+	/** query returning a row */
 	/**See class note for input
 	@warning "limit 1" is appended to the sql input
 	@return	a single row
@@ -488,7 +488,7 @@ Class Db{
 	-	prepared statement: $x = Db::row(['select * from inquiry where id = ?',[7]]);
 	-	table and dictionary: #$x = Db::row('inquiry', ['id'=>7]);
 	*/
-	#@note	returns `false` if no match
+	/**@note	returns `false` if no match */
 	protected function row(){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		#function implies only 1 retured row
@@ -500,11 +500,11 @@ Class Db{
 		$res = $this->as_conform_res(func_get_args());
 		return $res->fetch(\PDO::FETCH_ASSOC);
 	}
-	/// query returning multiple rows
+	/** query returning multiple rows */
 	/**See class note for input
 	@return	a sequential array of rows
 	*/
-	#@note	returns `[]` if no match
+	/**@note	returns `[]` if no match */
 	protected function rows($sql){
 		$sql = $this->getOverloadedSql(1,func_get_args());
 		return $this->as_rows($this->query($sql));
@@ -519,14 +519,14 @@ Class Db{
 			$i++;	}
 		return $res2;	}
 
-	# get all records
+	/** get all records */
 	protected function all($table){
 		$args = func_get_args();
 		array_splice($args, 1, 0, '1=1');
 		return call_user_func_array([$this,'rows'], $args);
 	}
 
-	/// query returning a column
+	/** query returning a column */
 	/**
 	See class note for input
 	@return	array where each element is the column value of each row.  If multiple columns are in the select, just uses the first column
@@ -544,7 +544,7 @@ Class Db{
 		return $res2;
 	}
 
-	/// query returning columns keyed their numeric position
+	/** query returning columns keyed their numeric position */
 	/**
 	See class note for input
 	@return	array where each element is the column value of each row.  If multiple columns are in the select, just uses the first column
@@ -562,7 +562,7 @@ Class Db{
 		return $res2;
 	}
 
-	/// query returning number indexed array
+	/** query returning number indexed array */
 	/**See class note for input
 	@return	row as numerically indexed array for potential use by php list function
 	*/
@@ -577,7 +577,7 @@ Class Db{
 	}
 
 
-	/// query returning a column with keys
+	/** query returning a column with keys */
 	/**See class note for input
 	@param	key	the column key to be used for each element.	If they key is an array, the first array element is taken as the key, the second is taken as the mapped value column
 	@return	array where one column serves as a key pointing to either another column or another set of columns
@@ -595,7 +595,7 @@ Class Db{
 			return Arrays::key_on_sub_key($rows, $key);
 		}
 	}
-	# alias; the overhead is worth the expectation
+	/** alias; the overhead is worth the expectation */
 	protected function column_key(){
 		return call_user_func_array([$this,'columnKey'], func_get_args());
 	}
@@ -607,7 +607,7 @@ Class Db{
 		return Arrays::key_on_sub_key($rows, $key);
 	}
 
-	///Key to value formatter (used for where clauses and updates)
+	/** Key to value formatter (used for where clauses and updates) */
 	/**
 	@param	kvA	various special syntax is applied:
 		normally, sets key = to value, like "key = 'value'" with the value escaped
@@ -629,7 +629,7 @@ Class Db{
 		}
 		return (array)$kvtA;
 	}
-	///Field to value formatter (used for where clauses and updates)
+	/** Field to value formatter (used for where clauses and updates) */
 	protected function ftvf($field,$value,$type=1){
 		if($field[0]=='"'){//quote v exactly (don't escape),
 			return $value;
@@ -677,7 +677,7 @@ Class Db{
 
 
 
-	/// construct where clause prefixed withe `WHERE`
+	/** construct where clause prefixed withe `WHERE` */
 	protected function where($where, $gauranteed_where=true){
 		$conditions_sql = $this->conditions($where);
 
@@ -685,7 +685,7 @@ Class Db{
 			return "\nWHERE ".$conditions_sql;
 		}
 	}
-	/// construct where clause from array or string
+	/** construct where clause from array or string */
 	/**
 	@param	where	various forms:
 		- either plain sql statement "bob = 'sue'"
@@ -708,8 +708,8 @@ Class Db{
 		return $where;
 	}
 
-	# does single query for multiple inserts.  Uses first row as key template
-	/* params
+	/** does single query for multiple inserts.  Uses first row as key template */
+	/** params
 	< command > < SQL insert command, like "INSERT" or "REPLACE" >
 	< table > < the db table name >
 	< rows > {
@@ -728,7 +728,7 @@ Class Db{
 		$this->query($command.' INTO '.$this->quoteIdentity($table).' ('.implode(',',$keys).")\t\nVALUES ".implode(',',$insertRows));
 	}
 
-	/// Key value parser
+	/** Key value parser */
 	protected function kvp($kvA){
 		foreach($kvA as $k=>$v){
 			if($k[0]==':'){
@@ -747,7 +747,7 @@ Class Db{
 		return array($keys,$values);
 	}
 
-	/// Key value formatter (used for insert like statements)
+	/** Key value formatter (used for insert like statements) */
 	/**
 	@param	kva	array('key' => 'value',...)	special syntax is applied:
 		- normally, sets (key) values (value) with the value escaped
@@ -760,7 +760,7 @@ Class Db{
 	}
 
 
-	/// Insert into a table
+	/** Insert into a table */
 	/**
 	@param	table	table to insert on
 	@param	kva	see self::kvf() function
@@ -769,7 +769,7 @@ Class Db{
 	protected function insert($table,$kvA){
 		return $this->into('INSERT',$table,$kvA);
 	}
-	/// Insert with a table and ignore if duplicate key found
+	/** Insert with a table and ignore if duplicate key found */
 	/**
 	@param	table	table to insert on
 	@param	kva	see self::kvf() function
@@ -783,12 +783,12 @@ Class Db{
 		}
 		return $this->into($type, $table, $kvA, '', $matchKeys);
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function insert_ignore(){
 		return calL_user_func_array([$this,'insertIgnore'], func_get_args());
 	}
-	/// insert into table; on duplicate key update
-	/*
+	/** insert into table; on duplicate key update */
+	/**
 	@param	table	table to insert on
 	@param	kva	see self::kvf() function
 	@param	update	either plain sql or null; if null, defaults to updating all values to $kvA input
@@ -803,13 +803,13 @@ Class Db{
 		}
 		return $this->into('INSERT',$table,$kvA,"\nON DUPLICATE KEY UPDATE\n".$update,$matchKeys);
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function insert_update(){
 		return call_user_func_array([$this,'insertUpdate'], func_get_args());
 	}
 
-	/// replace on a table
-	/*
+	/** replace on a table */
+	/**
 	@param	table	table to replace on
 	@param	kva	see self::kvf() function
 	@param	matchKeys	keys used to identify row to get the id
@@ -824,8 +824,8 @@ Class Db{
 		return $this->into($type,$table,$kvA,'',$matchKeys);
 	}
 
-	/// internal use; perform insert into [called from in(), inUp()]
-	/*
+	/** internal use; perform insert into [called from in(), inUp()] */
+	/**
 	@note	insert ignore and insert update do not return a row id, so, if the id is not provided and the matchKeys are not provided, may not return row id
 	@return will attempt to get row id, otherwise will return count of affected rows
 	*/
@@ -843,8 +843,8 @@ Class Db{
 		}
 	}
 
-	/// perform update, returns number of affected rows
-	/*
+	/** perform update, returns number of affected rows */
+	/**
 	@param	table	table to update
 	@param	update	see self::ktvf() function
 	@param	where	see self::where() function
@@ -860,8 +860,8 @@ Class Db{
 		return $res->rowCount();
 	}
 
-	/// perform delete
-	/*
+	/** perform delete */
+	/**
 	@param	table	table to replace on
 	@param	where	see self::where() function
 	@return	row count
@@ -874,8 +874,8 @@ Class Db{
 		return $this->query('DELETE FROM '.$this->quoteIdentity($table).$this->where($where))->rowCount();
 	}
 
-	///generate sql
-	/*
+	/** generate sql */
+	/**
 	Ex:
 		- row('select * from user where id = 20') vs row('user',20);
 		- rows('select name from user where id > 20') vs sRows('user',array('id?>'=>20),'name')
@@ -920,12 +920,12 @@ Class Db{
 		}
 		return $select;
 	}
-	# alias for `select`
+	/** alias for `select` */
 	protected function sql(){
 		return call_user_func_array([$this, 'select'], func_get_args());
 	}
 //+ helper tools {
-	/// query check if there is a match
+	/** query check if there is a match */
 	/**See class note for input
 	@return	true if match, else false
 	*/
@@ -933,7 +933,7 @@ Class Db{
 		$sql = $this->select($table,$where,'1');
 		return $this->value($sql) ? true : false;
 	}
-	# alias for "check"
+	/** alias for "check" */
 	protected function exists($table, $where){
 		$alias = 'check';
 		return call_user_func_array([$this,$alias], func_get_args());
@@ -941,7 +941,7 @@ Class Db{
 
 
 
-	/// get the id of some row, or make it if the row doesn't exist
+	/** get the id of some row, or make it if the row doesn't exist */
 	/**
 	@param	additional	additional fields to merge with where on insert
 	*/
@@ -957,7 +957,7 @@ Class Db{
 		return $id;
 	}
 
-	///get id based on name if non-int, otherwise return int
+	/** get id based on name if non-int, otherwise return int */
 	/**
 		@param	dict	dictionary to update on query
 	*/
@@ -971,12 +971,12 @@ Class Db{
 		}
 		return $id;
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function named_id(){
 		return call_user_func_array([$this,'namedId'], func_get_args());
 	}
 
-	/// perform a count and select rows; doesn't work with all sql
+	/** perform a count and select rows; doesn't work with all sql */
 	/**
 	Must have "ORDER" on separate and single line
 	Must have "LIMIT" on separate line
@@ -1009,7 +1009,7 @@ Class Db{
 		$results = $this->rows($sql);
 		return array($count,$results);
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function count_and_rows(){
 		return calL_user_func_array([$this,'countAndRows'], func_get_args());
 	}
@@ -1022,11 +1022,11 @@ Class Db{
 		}
 		return (bool) count($this->rows('show tables like '.$this->quote($table)));
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function table_exists(){
 		return call_user_func_array([$this,'tableExists'], func_get_args());
 	}
-	//Get database tables
+	/**Get database tables */
 	protected function tables(){
 		$driver = $this->under->getAttribute(\PDO::ATTR_DRIVER_NAME);
 		if($driver == 'mysql'){
@@ -1038,7 +1038,7 @@ Class Db{
 	}
 
 	public $tablesInfo = [];
-	//get database table column information
+	/**get database table column information */
 	protected function tableInfo($table){
 		if(!$this->tablesInfo[$table]){
 			$columns = array();
@@ -1091,14 +1091,14 @@ Class Db{
 		}
 		return ['table'=>$table, 'columns'=>$columns];
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function table_info(){
 		return call_user_func_array([$this,'tableInfo'], func_get_args());
 	}
 	protected function column_names($table){
 		return array_keys($this->table_info($table)['columns']);
 	}
-	//take db specific column type and translate it to general
+	/**take db specific column type and translate it to general */
 	static function parseColumnType($type){
 		$type = trim(strtolower(preg_replace('@\([^)]*\)|,@','',$type)));
 		if(preg_match('@int@i',$type)){//int,bigint
@@ -1121,7 +1121,7 @@ Class Db{
 		}
 	}
 	public $indices;
-	///get all the keys in a table, including the non-unique ones
+	/** get all the keys in a table, including the non-unique ones */
 	protected function indices($table){
 		if(!$this->indices[$table]){
 			$rows = $this->rows('show indexes in '.$this->quoteIdentity($table));
@@ -1139,23 +1139,23 @@ Class Db{
 	protected function startTransaction(){
 		$this->under->beginTransaction();
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function start_transaction(){
 		return call_user_func_array([$this,'startTransaction'], func_get_args());
 	}
-	# to exit a transaction, you either commit it or roll it back
+	/** to exit a transaction, you either commit it or roll it back */
 	protected function commitTransaction(){
 		$this->under->commit();
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function commit_transaction(){
 		return call_user_func_array([$this,'commitTransaction'], func_get_args());
 	}
-	# to exit a transaction, you either commit it or roll it back
+	/** to exit a transaction, you either commit it or roll it back */
 	protected function rollbackTransaction(){
 		$this->under->rollBack();
 	}
-	# the overhead is worth the expectation
+	/** the overhead is worth the expectation */
 	protected function rollback_transaction(){
 		return call_user_func_array([$this,'rollbackTransaction'], func_get_args());
 	}

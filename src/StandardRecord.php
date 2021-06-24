@@ -10,8 +10,8 @@ use \Exception;
 class StandardRecord extends StandardRecordAbstract{
 	public $transformers = ['get'=>null, 'set'=>null];
 	public $json_mapped_columns = [];
-	# see Grithin\Record for other option values
-	/*	params
+	/** see Grithin\Record for other option values */
+	/**	params
 		options; {
 			db: < db object >
 			json_mapped_columns: (
@@ -56,7 +56,7 @@ class StandardRecord extends StandardRecordAbstract{
 		parent::__construct($identifier, [$this, 'getter'], [$this, 'setter'], $options);
 	}
 
-	# utility function to create a new record and return it as this class
+	/** utility function to create a new record and return it as this class */
 	static function create($table, $record, $options=[]){
 		$db = $options['db'] ? $options['db'] : \Grithin\Db::primary();
 		$id = $db->insert($table, $record);

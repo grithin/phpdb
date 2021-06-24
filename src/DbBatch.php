@@ -17,7 +17,7 @@ class DbBatch implements \Iterator{
 		$this->db = $db;
 		$this->position = 0;
 	}
-	/// used to translate static calls to the primary database instance
+	/** used to translate static calls to the primary database instance */
 	static function __callStatic($name,$arguments){
 		if(!method_exists(__class__,$name)){
 			Debug::toss('DbBatch method not found: '.$name);
@@ -86,7 +86,7 @@ class DbBatch implements \Iterator{
 	}
 //+	}
 //+	for putting batches {
-	///insert multiple rows
+	/** insert multiple rows */
 	private function put($table,$rows){
 		if($rows){
 			return $this->db->intos('INSERT',$table,$rows);
@@ -102,7 +102,7 @@ class DbBatch implements \Iterator{
 			return $this->db->intos('REPLACE',$table,$rows);
 		}
 	}
-	///currently just executes insertUpdate for all rows
+	/** currently just executes insertUpdate for all rows */
 	private function putUpdate($table,$rows){
 		if($rows){
 			foreach($rows as $row){

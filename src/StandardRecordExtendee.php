@@ -12,8 +12,8 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 	static $id_column = 'id';
 	public $transformers = ['get'=>null, 'set'=>null];
 	public $json_mapped_columns = [];
-	# see Grithin\Record for other option values
-	/*	params
+	/** see Grithin\Record for other option values */
+	/**	params
 		options; {
 			db: < db object >
 			initial_record: < preloaded record >
@@ -90,16 +90,16 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 	static function transform_on_set_apply($row){
 		return static::pseudo_get()->transformers['set']($row);
 	}
-	# apply transformation to just the key name
+	/** apply transformation to just the key name */
 	static function transform_on_get_apply_to_key($key){
 		return array_keys(static::transform_on_get_apply([$key=>null]))[0];
 	}
-	# apply transformation to just the key name
+	/** apply transformation to just the key name */
 	static function transform_on_set_apply_to_key($key){
 		return array_keys(static::transform_on_set_apply([$key=>null]))[0];
 	}
 
-	/*
+	/**
 	Allow for variable input to be transformed into a record, using the cases of:
 	-	already a record, return it
 	-	a scalar, use as identifier
@@ -147,8 +147,8 @@ abstract class StandardRecordExtendee extends StandardRecordAbstract{
 		return static::from_initial($record, $new_key, $options);
 	}
 
-	# utility function to create a new record and return it as this class
-	/* params
+	/** utility function to create a new record and return it as this class */
+	/** params
 	@record:	[]< raw, untransformed record (json fields must be text) >
 	*/
 	static function static_creates($record, $options=[]){

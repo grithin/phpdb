@@ -21,7 +21,7 @@ class DbLock{
 	public function locked(){
 		return $this->locked;
 	}
-	# checks against database regardless of local locked variable
+	/** checks against database regardless of local locked variable */
 	public function is_free(){
 		return Db::value(["SELECT IS_FREE_LOCK(?)", [$this->name]]);
 	}
