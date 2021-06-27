@@ -71,18 +71,19 @@ Class Db{
 			$this->connectionInfo['dsn'] =  $this->makeDsn($this->connectionInfo);
 		}
 		try{
-			if($this->options['loader']){
+			if(!empty($this->options['loader'])){
 				$this->under = $this->options['loader']($this->connectionInfo);
 				if(!$this->under || !($this->under instanceof \PDO)){
 					throw new \Exception('Loader function did not provide PDO instance');
 				}
 			}else{
+				$this->connectionInfo = array_merge(['user'=>null, 'dsn'=>null, 'password'=>null], $this->connectionInfo);
 				$this->under = new \PDO($this->connectionInfo['dsn'], $this->connectionInfo['user'], $this->connectionInfo['password']);
 				$this->under->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
 			}
 		}catch(\PDOException $e){
-			if($this->connectionInfo['backup']){
+			if(!empty($this->connectionInfo['backup'])){
 				$this->connectionInfo = $this->connectionInfo['backup'];
 				$this->load();
 				return;
