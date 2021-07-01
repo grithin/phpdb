@@ -58,6 +58,7 @@ $db->replace($table, $query);
 $db->rows($table, $query);
 $db->row($table, $query);
 $db->value($table, $query);
+# ...
 ```
 
 ### Optional Use
