@@ -4,6 +4,75 @@
 
 Provide easy access methods, common database output formatting and standard input handling.
 
+
+## Appetizer
+The intent of the Db class is to reduce the amount of time coding common database operations.
+
+### Output
+One common issue is formatting.  Say I want only a column in a database, and I want it as an array
+```php
+$db->column('select name from user');
+```
+Say I want an array of rows, but I want it keyed on the user id
+```php
+$db->column_key('id', 'select name from user');
+```
+What if I just want a single, non array value of some column, in some record?
+```php
+$db->value('select name from user where id = 2');
+```
+
+### Special Query
+For a query, the normal `['id'=> 2]` array does not suit for situations of non-equal operators.  What if I wanted `name is null` or `id > 10`?  This is built in to Db
+
+```php
+$table = 'users';
+$query = [
+	'id ? >' => 10, # '?' indicates the operator will appear next
+	'name ? is not' => null # null values are presented to the database as string NULL
+	'disabled' => null,
+	'gender' => 'm'
+	':last_login' => 'DATE()' # the ":" preface indicates not to escape the value part
+];
+$db->rows($table, $query)
+```
+This will result in SQL like
+```sql
+SELECT * FROM `x` WHERE
+`id` > 10 AND
+`name` is not null AND
+`disabled` is null AND
+`gender` = 'm' AND
+`last_login` = DATE()
+```
+
+This special type of array interpretation allows the full set of complex query filters to be maintained in an array, instead of having to construct the SQL piece by piece.
+
+The query array can be used on all of the methods
+```php
+$db->delete($table, $query);
+$db->insert($table, $query);
+$db->insertIgnore($table, $query);
+$db->insertUpdate($table, $query);
+$db->replace($table, $query);
+$db->rows($table, $query);
+$db->row($table, $query);
+$db->value($table, $query);
+```
+
+### Optional Use
+There are a variety of ways you can present your SQL.  Db suports
+-	prepared statements
+-	plain txt
+-	query array and positional arguments `($table, $query, $select)`
+```php
+$db->row(['select name from user where id = :id', [':id'=>1]]);
+$db->row('select name from user where id = `1`');
+$db->row('user', ['id'=>1], 'name');
+```
+
+
+
 ## Use
 
 ### Connecting
@@ -95,7 +164,7 @@ Db::columns('select * from user');
 
 list($id, $name) =  Db::enumerate('select id, name from user');
 
-Db::columnKey('id','select id, name from user');
+Db::column_key('id','select id, name from user');
 #> ['1'=>'bob', '2'=>'bill']
 # if more than 2 columns are selected, the key points to another array, ex:
 #	#> ['1'=>['name'=>'bob', 'gender'=>'m'], '2'=>['name'=>'bill', 'gender'=>'m']]
@@ -109,8 +178,8 @@ Db::row('user',['id'=>1]); # select * from user where id = 1
 
 Db::insert('user',['name'=>'jill']);
 
-Db::insertIgnore('user',['name'=>'jill']);
-Db::insertUpdate('user',['id'=>'3','name'=>'jill']);
+Db::insert_ignore('user',['name'=>'jill']);
+Db::insert_update('user',['id'=>'3','name'=>'jill']);
 
 Db::replace('user',['id'=>'2', 'name'=>'jill']);
 
@@ -131,8 +200,8 @@ Using a custom comparater
 Db::row('user', ['id?>'=>1]); # select * from user where id > 1
 ```
 There is various behavior based on these rules:
--	if key starts with '"', unescaped value taken as entire where line
-	-	ex: ['"':'1=1']
+-	if key starts with '"', the unescaped value is taken as entire where line
+	-	ex: ['" anything after the " is not used':'1=1']
 -	if "?" is in the key, the part after the "?" will serve as the "equator", ("bob?<>"=>'sue') -> "bob <> 'sue'"
 -	if key starts with ":", value is not escaped
 -	if value === null, set value to unescaped "null"

@@ -66,6 +66,7 @@ Class Db{
 		$this->options = array_merge(['sql_mode'=>'ANSI'], $options);;
 	}
 
+	public $driver;
 	function load(){
 		if(!$this->connectionInfo['dsn']){
 			$this->connectionInfo['dsn'] =  $this->makeDsn($this->connectionInfo);
