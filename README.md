@@ -62,7 +62,7 @@ $db->value($table, $query);
 ```
 
 ### Optional Use
-There are a variety of ways you can present your SQL.  Db suports
+There are a variety of ways you can present your SQL.  Db supports
 -	prepared statements
 -	plain txt
 -	query array and positional arguments `($table, $query, $select)`
