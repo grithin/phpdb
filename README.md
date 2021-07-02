@@ -1,8 +1,10 @@
 # PHP Database Tools
 
+
+
 ## Purpose
 
-Provide easy access methods, common database output formatting and standard input handling.
+A convenience wrapper over PDO that has lazy loading and singletons, allows for backup connections, and attempts to reconnect on connection loss
 
 
 ## Appetizer
@@ -52,8 +54,8 @@ The query array can be used on all of the methods
 ```php
 $db->delete($table, $query);
 $db->insert($table, $query);
-$db->insertIgnore($table, $query);
-$db->insertUpdate($table, $query);
+$db->insert_ignore($table, $query);
+$db->insert_update($table, $query);
 $db->replace($table, $query);
 $db->rows($table, $query);
 $db->row($table, $query);
@@ -112,7 +114,7 @@ $db2 = Db::init('secondary', $config2);
 Db::row('user',$id); # still on $db1 instance
 $db2->row('user',$id);
 
-Db::setPrimary('secondary');
+Db::primary_set('secondary');
 Db::row('user',$id); # on $db2 instance
 ```
 If you want a instance variable for  the primary singleton (the singleton default), you can get it
@@ -142,7 +144,7 @@ All user input placed in raw sql should be quoted or conformed.  You can quote w
 
 You can also quote database identities, with
 ```php
-'select '.Db::quoteIdentity('table.max').' from '.Db::quoteIdentity('table').' where id = 1'
+'select '.Db::identity_quote('table.max').' from '.Db::identity_quote('table').' where id = 1'
 ```
 This is sometimes useful when the identity has a name conflicting with a reserved database identity
 

@@ -102,11 +102,11 @@ class DbBatch implements \Iterator{
 			return $this->db->intos('REPLACE',$table,$rows);
 		}
 	}
-	/** currently just executes insertUpdate for all rows */
+	/** currently just executes insert_update for all rows */
 	private function putUpdate($table,$rows){
 		if($rows){
 			foreach($rows as $row){
-				$this->db->insertUpdate($table,$row);
+				$this->db->insert_update($table,$row);
 			}
 		}
 	}
